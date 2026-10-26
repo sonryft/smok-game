@@ -1,47 +1,233 @@
-import {supabase,requireSession,hasPermission,money} from "./supabase.js";
-const auth=await requireSession("sales.create");
-if(!auth) throw new Error("Sesión requerida");
-const {profile}=auth;
-document.documentElement.dataset.theme=localStorage.getItem("smok-theme")||"carbon";
-document.querySelector("#sales-user").textContent=profile.full_name||profile.username;
-document.querySelector("#sales-logout").addEventListener("click",async()=>{await supabase.auth.signOut();location.replace("login.html")});
-// Aísla la pantalla de ventas: no contiene enlaces al panel y el botón Atrás no revela el dashboard.
-history.replaceState({salesOnly:true},"",location.href);
-history.pushState({salesOnly:true},"",location.href);
-window.addEventListener("popstate",()=>{history.pushState({salesOnly:true},"",location.href);});
-let products=[],cart=[];
-const resultEl=document.querySelector("#product-results"),cartEl=document.querySelector("#cart-items"),searchEl=document.querySelector("#product-search");
-const {data:productRows,error}=await supabase.from("products").select("id,name,sku,sale_price,stock,is_active").eq("is_active",true).order("name");
-if(error) resultEl.innerHTML='<div class="empty-state">No se pudieron cargar productos. Revisa la conexión y los permisos.</div>';
-else {products=productRows||[];renderProducts(products);}
-function renderProducts(rows){resultEl.innerHTML=rows.length?rows.map(p=>`<button class="product-card" data-product="${p.id}" ${Number(p.stock)<=0?"disabled":""}><strong>${escapeHtml(p.name)}</strong><span>${escapeHtml(p.sku||"Sin código")} · Stock: ${p.stock}</span><b>${money(p.sale_price)}</b></button>`).join(""):'<div class="empty-state">No se encontraron productos disponibles.</div>';resultEl.querySelectorAll("[data-product]").forEach(b=>b.addEventListener("click",()=>addProduct(products.find(p=>p.id===b.dataset.product))));}
-function escapeHtml(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
-searchEl.addEventListener("input",()=>{const q=searchEl.value.toLowerCase().trim();renderProducts(products.filter(p=>p.name.toLowerCase().includes(q)||(p.sku||"").toLowerCase().includes(q)));});
-function addProduct(p){if(!p)return;const found=cart.find(x=>x.id===p.id);if(found){if(found.quantity>=p.stock)return showMessage("No hay existencias suficientes.");found.quantity++;}else cart.push({...p,quantity:1});renderCart();}
-function renderCart(){cartEl.innerHTML=cart.length?cart.map(p=>`<div class="cart-item"><div><strong>${escapeHtml(p.name)}</strong><small>${money(p.sale_price)} por unidad</small><div class="quantity-controls"><button data-minus="${p.id}">−</button><span>${p.quantity}</span><button data-plus="${p.id}">+</button><button data-remove="${p.id}" title="Quitar">×</button></div></div><strong>${money(p.sale_price*p.quantity)}</strong></div>`).join(""):'<div class="empty-state">Aún no hay productos.</div>';
-cartEl.querySelectorAll("[data-minus]").forEach(b=>b.onclick=()=>changeQty(b.dataset.minus,-1));cartEl.querySelectorAll("[data-plus]").forEach(b=>b.onclick=()=>changeQty(b.dataset.plus,1));cartEl.querySelectorAll("[data-remove]").forEach(b=>b.onclick=()=>{cart=cart.filter(p=>p.id!==b.dataset.remove);renderCart();});updateTotal();}
-function changeQty(id,delta){const p=cart.find(x=>x.id===id);if(!p)return;if(delta>0&&p.quantity>=p.stock)return showMessage("No hay existencias suficientes.");p.quantity+=delta;if(p.quantity<=0)cart=cart.filter(x=>x.id!==id);renderCart();}
-function total(){return cart.reduce((a,p)=>a+Number(p.sale_price)*p.quantity,0)}
-function updateTotal(){document.querySelector("#cart-total").textContent=money(total());const cash=Number(document.querySelector("#amount-received").value||0);document.querySelector("#change-amount").textContent=money(Math.max(0,cash-total()));const cashMethod=document.querySelector("#payment-method").value==="efectivo";document.querySelector("#amount-received").disabled=!cashMethod;document.querySelector("#received-label").classList.toggle("hidden",!cashMethod);}
-document.querySelector("#payment-method").addEventListener("change",updateTotal);document.querySelector("#amount-received").addEventListener("input",updateTotal);document.querySelector("#clear-cart").addEventListener("click",()=>{cart=[];renderCart();showMessage("");});
-function showMessage(s,ok=false){const el=document.querySelector("#sale-message");el.textContent=s;el.style.color=ok?"var(--good)":"var(--danger)";}
-document.querySelector("#complete-sale").addEventListener("click",async()=>{
- if(!cart.length)return showMessage("Añade al menos un producto.");
- const totalValue=total(),method=document.querySelector("#payment-method").value,received=Number(document.querySelector("#amount-received").value||0);
- if(method==="efectivo"&&received<totalValue)return showMessage("El importe recibido no alcanza el total.");
- const btn=document.querySelector("#complete-sale");btn.disabled=true;btn.textContent="Registrando…";
- try{
-   const {data:shift,error:shiftErr}=await supabase.from("cash_shifts").select("id").eq("status","open").limit(1).maybeSingle();
-   if(shiftErr)throw shiftErr;
-   if(!shift)throw new Error("No hay una caja abierta. Solicita al administrador que abra la caja.");
-   const payload={p_items:cart.map(p=>({product_id:p.id,quantity:p.quantity})),p_payment_method:method,p_cash_received:method==="efectivo"?received:null,p_shift_id:shift.id};
-   const {data,error}=await supabase.rpc("create_sale",payload);
-   if(error)throw error;
-   const change=method==="efectivo"?received-totalValue:0;
-   showMessage(`Venta registrada correctamente. Cambio: ${money(change)}.`,true);
-   cart=[];renderCart();searchEl.value="";renderProducts(products);
-   const {data:updated}=await supabase.from("products").select("id,name,sku,sale_price,stock,is_active").eq("is_active",true).order("name");products=updated||[];renderProducts(products);
- }catch(e){showMessage(e.message||"No se pudo registrar la venta.");}
- finally{btn.disabled=false;btn.textContent="Confirmar venta";}
+import { supabase, requireSession, money } from "./supabase.js";
+
+const auth = await requireSession("sales.create");
+if (!auth) throw new Error("Sesión requerida");
+
+const { profile } = auth;
+const $ = (selector) => document.querySelector(selector);
+const searchEl = $("#product-search");
+const productList = $("#products-list");
+const qtyEl = $("#quantity");
+const paymentEl = $("#payment-method");
+const receivedEl = $("#amount-received");
+const historyEl = $("#sales-history");
+let products = [];
+let selectedProduct = null;
+let salesHistory = [];
+
+document.documentElement.dataset.theme = localStorage.getItem("smok-theme") || "carbon";
+$("#sales-user").textContent = profile.full_name || profile.username || "Usuario";
+$("#sales-logout").addEventListener("click", async () => {
+  await supabase.auth.signOut();
+  location.replace("login.html");
 });
-updateTotal();
+
+// Mantiene esta pantalla aislada del panel principal al usar Atrás.
+history.replaceState({ salesOnly: true }, "", location.href);
+history.pushState({ salesOnly: true }, "", location.href);
+window.addEventListener("popstate", () => history.pushState({ salesOnly: true }, "", location.href));
+
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  }[c]));
+}
+function methodLabel(method) {
+  const m = String(method || "").toLowerCase();
+  return m === "qr" ? "QR" : m === "efectivo" ? "Efectivo" : m || "—";
+}
+function showMessage(message, type = "error") {
+  const el = $("#sale-message");
+  el.textContent = message;
+  el.className = `message ${type}`;
+}
+function setSelectedProduct() {
+  const value = searchEl.value.trim().toLocaleLowerCase();
+  selectedProduct = products.find((p) =>
+    String(p.name || "").toLocaleLowerCase() === value ||
+    String(p.sku || "").toLocaleLowerCase() === value
+  ) || null;
+
+  $("#product-hint").textContent = selectedProduct
+    ? `Disponible: ${selectedProduct.stock} unidades`
+    : "Selecciona un producto de la lista para cargar su precio.";
+  $("#unit-price").value = selectedProduct ? money(selectedProduct.sale_price) : money(0);
+  updateSummary();
+}
+function updateSummary() {
+  const quantity = Math.max(0, Number.parseInt(qtyEl.value || "0", 10) || 0);
+  const total = selectedProduct ? Number(selectedProduct.sale_price || 0) * quantity : 0;
+  $("#summary-product").textContent = selectedProduct?.name || "—";
+  $("#summary-quantity").textContent = String(selectedProduct ? quantity : 0);
+  $("#summary-payment").textContent = methodLabel(paymentEl.value);
+  $("#summary-total").textContent = money(total);
+
+  const cash = paymentEl.value === "efectivo";
+  $("#cash-fields").classList.toggle("show", cash);
+  $("#change-field").classList.toggle("show", cash);
+  receivedEl.disabled = !cash;
+  $("#payment-note").textContent = cash
+    ? "Registra cuánto dinero recibiste para calcular el cambio."
+    : "El pago por QR no se suma al efectivo físico de caja.";
+  const received = Number(receivedEl.value || 0);
+  $("#change-amount").value = money(Math.max(0, received - total));
+}
+function renderProductOptions() {
+  productList.innerHTML = products.map((p) => {
+    const label = p.sku ? `${p.name} · ${p.sku}` : p.name;
+    return `<option value="${escapeHtml(label)}"></option>`;
+  }).join("");
+}
+// Resolve a datalist selection by exact label, product name, or SKU.
+function resolveProduct() {
+  const value = searchEl.value.trim().toLocaleLowerCase();
+  selectedProduct = products.find((p) => {
+    const label = p.sku ? `${p.name} · ${p.sku}` : p.name;
+    return [p.name, p.sku, label].some((v) => String(v || "").toLocaleLowerCase() === value);
+  }) || null;
+  $("#product-hint").textContent = selectedProduct
+    ? `Stock disponible: ${selectedProduct.stock}`
+    : "Selecciona un producto válido de la lista.";
+  $("#unit-price").value = selectedProduct ? money(selectedProduct.sale_price) : money(0);
+  updateSummary();
+}
+
+async function loadProducts() {
+  const { data, error } = await supabase
+    .from("products")
+    .select("id,name,sku,sale_price,stock,is_active")
+    .eq("is_active", true)
+    .order("name");
+  if (error) {
+    $("#product-hint").textContent = "No se pudieron cargar los productos. Revisa los permisos de acceso.";
+    return;
+  }
+  products = (data || []).filter((p) => Number(p.stock) > 0);
+  renderProductOptions();
+}
+
+function renderHistory(rows) {
+  if (!rows.length) {
+    historyEl.innerHTML = '<tr><td colspan="5" class="empty-row">Todavía no hay ventas registradas.</td></tr>';
+    return;
+  }
+  historyEl.innerHTML = rows.map((sale) => {
+    const date = sale.created_at ? new Date(sale.created_at).toLocaleString("es-BO") : "—";
+    const id = String(sale.receipt_number ?? sale.id ?? "").slice(0, 12);
+    const status = String(sale.status || "completada");
+    return `<tr>
+      <td>${escapeHtml(date)}</td>
+      <td>${escapeHtml(id || "—")}</td>
+      <td>${escapeHtml(methodLabel(sale.payment_method))}</td>
+      <td><strong>${escapeHtml(money(sale.total))}</strong></td>
+      <td><span class="status">${escapeHtml(status)}</span></td>
+    </tr>`;
+  }).join("");
+}
+async function loadHistory() {
+  historyEl.innerHTML = '<tr><td colspan="5" class="empty-row">Cargando ventas…</td></tr>';
+  // Only select core columns to stay compatible with the existing sales table.
+  const { data, error } = await supabase
+    .from("sales")
+    .select("id,created_at,total,payment_method,status")
+    .order("created_at", { ascending: false })
+    .limit(100);
+  if (error) {
+    historyEl.innerHTML = '<tr><td colspan="5" class="empty-row">No se pudo cargar el historial con los permisos actuales.</td></tr>';
+    $("#history-message").textContent = error.message;
+    return;
+  }
+  salesHistory = data || [];
+  renderHistory(salesHistory);
+}
+searchEl.addEventListener("input", resolveProduct);
+searchEl.addEventListener("change", resolveProduct);
+qtyEl.addEventListener("input", updateSummary);
+paymentEl.addEventListener("change", updateSummary);
+receivedEl.addEventListener("input", updateSummary);
+
+$("#history-search").addEventListener("input", () => {
+  const q = $("#history-search").value.trim().toLocaleLowerCase();
+  renderHistory(salesHistory.filter((s) =>
+    [s.id, s.receipt_number, s.payment_method, s.status, s.total, s.created_at]
+      .some((v) => String(v ?? "").toLocaleLowerCase().includes(q))
+  ));
+});
+
+$("#export-csv").addEventListener("click", () => {
+  if (!salesHistory.length) {
+    $("#history-message").textContent = "No hay ventas para exportar.";
+    return;
+  }
+  const rows = [
+    ["Fecha", "N.º de venta", "Método de pago", "Total", "Estado"],
+    ...salesHistory.map((s) => [
+      s.created_at ? new Date(s.created_at).toLocaleString("es-BO") : "",
+      s.receipt_number ?? s.id ?? "",
+      methodLabel(s.payment_method),
+      Number(s.total || 0).toFixed(2),
+      s.status || "completada"
+    ])
+  ];
+  const csv = "\uFEFF" + rows.map((row) =>
+    row.map((value) => `"${String(value ?? "").replace(/"/g, '""')}"`).join(",")
+  ).join("\r\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `smok-game-ventas-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+$("#complete-sale").addEventListener("click", async () => {
+  if (!selectedProduct) return showMessage("Selecciona un producto válido.");
+  const quantity = Number.parseInt(qtyEl.value || "0", 10);
+  if (!Number.isInteger(quantity) || quantity < 1) return showMessage("La cantidad debe ser al menos 1.");
+  if (quantity > Number(selectedProduct.stock)) return showMessage("No hay existencias suficientes.");
+  const total = Number(selectedProduct.sale_price || 0) * quantity;
+  const method = paymentEl.value;
+  const received = Number(receivedEl.value || 0);
+  if (method === "efectivo" && received < total) return showMessage("El importe recibido no alcanza el total.");
+
+  const button = $("#complete-sale");
+  button.disabled = true;
+  button.textContent = "Registrando…";
+  try {
+    const { data: shift, error: shiftError } = await supabase
+      .from("cash_shifts")
+      .select("id")
+      .eq("status", "open")
+      .limit(1)
+      .maybeSingle();
+    if (shiftError) throw shiftError;
+    if (!shift) throw new Error("No hay una caja abierta. Solicita al administrador que abra la caja.");
+
+    const payload = {
+      p_items: [{ product_id: selectedProduct.id, quantity }],
+      p_payment_method: method,
+      p_cash_received: method === "efectivo" ? received : null,
+      p_shift_id: shift.id
+    };
+    const { error } = await supabase.rpc("create_sale", payload);
+    if (error) throw error;
+
+    showMessage(`Venta registrada. Cambio: ${money(method === "efectivo" ? received - total : 0)}.`, "ok");
+    searchEl.value = "";
+    qtyEl.value = "1";
+    receivedEl.value = "";
+    selectedProduct = null;
+    $("#unit-price").value = money(0);
+    await Promise.all([loadProducts(), loadHistory()]);
+    updateSummary();
+  } catch (error) {
+    showMessage(error?.message || "No se pudo registrar la venta.");
+  } finally {
+    button.disabled = false;
+    button.textContent = "Confirmar venta";
+  }
+});
+
+await Promise.all([loadProducts(), loadHistory()]);
+updateSummary();
