@@ -1,21 +1,112 @@
 <!doctype html>
 <html lang="es">
 <head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#090909"><title>Ventas · Smok Game</title><link rel="stylesheet" href="assets/css/app.css">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#090909">
+  <title>Ventas · Smok Game</title>
+  <link rel="stylesheet" href="assets/css/app.css">
+  <style>
+    :root{--sg-bg:#090909;--sg-panel:#121412;--sg-panel2:#171a17;--sg-line:#292d29;--sg-text:#f4f7f2;--sg-muted:#9aa39a;--sg-green:#b7ff35;--sg-red:#ff6666}
+    body.sales-body{margin:0;background:var(--sg-bg);color:var(--sg-text);font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    .sales-header{height:72px;padding:0 clamp(16px,4vw,44px);display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--sg-line);background:#0d0f0d}
+    .brand{display:flex;align-items:center;gap:12px;font-weight:800;letter-spacing:.08em}.brand img{width:38px;height:38px;object-fit:contain;border-radius:8px}.brand small{display:block;color:var(--sg-muted);font-size:10px;letter-spacing:.12em;margin-top:3px}
+    .sales-user{display:flex;align-items:center;gap:14px;color:var(--sg-muted);font-size:13px}
+    .sales-wrap{max-width:1450px;margin:auto;padding:28px clamp(14px,3vw,36px) 48px}
+    .sales-title{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:22px}.eyebrow{font-size:11px;letter-spacing:.18em;color:var(--sg-green);font-weight:800;margin:0 0 8px}.sales-title h1{font-size:clamp(26px,3vw,36px);margin:0;letter-spacing:-.04em}.muted{color:var(--sg-muted)}.badge{border:1px solid #3d5523;background:#18220e;color:var(--sg-green);padding:8px 12px;border-radius:999px;font-size:11px;font-weight:700}
+    .sales-grid{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(300px,.85fr);gap:18px;align-items:start}
+    .panel{background:var(--sg-panel);border:1px solid var(--sg-line);border-radius:16px;padding:22px;min-width:0}
+    .panel h2{font-size:17px;margin:0 0 5px}.panel-subtitle{font-size:12px;color:var(--sg-muted);margin:0 0 22px}
+    .form-grid{display:grid;grid-template-columns:minmax(0,1fr) 130px;gap:14px}
+    .field{display:flex;flex-direction:column;gap:8px;min-width:0}.field label{font-size:12px;color:#cbd1c8;font-weight:650}.field input,.field select,.field textarea{box-sizing:border-box;width:100%;min-height:44px;border:1px solid #353b35;background:#0b0d0b;color:var(--sg-text);border-radius:9px;padding:11px 12px;font:inherit;font-size:13px;outline:none}.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--sg-green);box-shadow:0 0 0 2px #b7ff351c}.field textarea{resize:vertical;min-height:76px}
+    .product-line{display:grid;grid-template-columns:minmax(0,1fr) 110px;gap:12px}.field-full{grid-column:1/-1}
+    .inline-hint{font-size:11px;color:var(--sg-muted);margin:7px 0 0}
+    .primary-btn,.secondary-btn,.export-btn{border:0;border-radius:9px;padding:12px 16px;font-weight:800;font-size:12px;cursor:pointer;transition:transform .15s,opacity .15s}.primary-btn{background:var(--sg-green);color:#11170a}.primary-btn:hover,.export-btn:hover{transform:translateY(-1px)}.primary-btn:disabled{opacity:.5;cursor:not-allowed;transform:none}.secondary-btn,.export-btn{background:#202420;color:var(--sg-text);border:1px solid #353b35}.export-btn{color:var(--sg-green)}
+    .summary-panel{position:sticky;top:18px}.summary-row{display:flex;justify-content:space-between;gap:14px;padding:12px 0;border-bottom:1px solid var(--sg-line);font-size:13px}.summary-row span{color:var(--sg-muted)}.summary-total{padding:20px 0 14px;display:flex;align-items:end;justify-content:space-between;gap:10px}.summary-total span{font-size:13px;color:var(--sg-muted)}.summary-total strong{font-size:30px;letter-spacing:-.04em;color:var(--sg-green)}.payment-note{font-size:11px;color:var(--sg-muted);line-height:1.5;margin:10px 0 16px}.checkout-btn{width:100%;min-height:48px}.message{font-size:12px;line-height:1.5;margin:12px 0 0;min-height:18px}.message.ok{color:var(--sg-green)}.message.error{color:var(--sg-red)}
+    .history-panel{margin-top:18px}.history-head{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:18px}.history-head h2{margin:0}.history-actions{display:flex;align-items:center;gap:10px}.history-search{width:min(260px,45vw);min-height:38px;border:1px solid #353b35;background:#0b0d0b;color:var(--sg-text);border-radius:8px;padding:8px 11px;box-sizing:border-box}
+    .table-scroll{overflow:auto;border:1px solid var(--sg-line);border-radius:10px}table{border-collapse:collapse;width:100%;min-width:600px;text-align:left}th,td{padding:13px 15px;border-bottom:1px solid var(--sg-line);font-size:12px;white-space:nowrap}th{background:#191c19;color:var(--sg-muted);font-size:10px;letter-spacing:.08em;text-transform:uppercase}tbody tr:last-child td{border-bottom:0}tbody tr:hover{background:#171a17}.status{display:inline-flex;padding:5px 8px;border-radius:99px;background:#19230f;color:var(--sg-green);font-size:10px;font-weight:800}.empty-row{text-align:center;color:var(--sg-muted);padding:28px}
+    .cash-fields{display:none}.cash-fields.show{display:block}.hidden{display:none!important}
+    @media(max-width:850px){.sales-grid{grid-template-columns:1fr}.summary-panel{position:static}.sales-wrap{padding-top:20px}.panel{padding:18px}}
+    @media(max-width:520px){.sales-header{height:62px}.brand{font-size:12px;gap:8px}.brand img{width:31px;height:31px}.brand small{font-size:8px}.sales-user{gap:8px;font-size:11px}.sales-user .secondary-btn{padding:9px;font-size:10px}.sales-title{align-items:flex-start}.badge{display:none}.form-grid,.product-line{grid-template-columns:1fr}.history-head{align-items:flex-start;flex-direction:column}.history-actions{width:100%}.history-search{width:100%;flex:1}.history-actions .export-btn{white-space:nowrap}.summary-total strong{font-size:26px}}
+  </style>
 </head>
 <body class="sales-body" data-page="sales">
-  <header class="sales-header"><div class="brand"><img src="assets/smok-game-neon.jpg" alt=""><span>SMOK GAME <small>· PUNTO DE VENTA</small></span></div><div class="sales-user"><span id="sales-user">Cargando…</span><button id="sales-logout" class="secondary-btn">Cerrar sesión</button></div></header>
-  <main class="sales-layout">
-    <section class="sales-catalog">
-      <div class="sales-heading"><div><p class="eyebrow">PUNTO DE VENTA</p><h1>Nueva venta</h1></div><span class="badge">Modo ventas</span></div>
-      <label class="search-label" for="product-search">Buscar producto</label><input id="product-search" class="search-input" placeholder="Nombre o código de producto…" autocomplete="off">
-      <div id="product-results" class="product-grid"><div class="empty-state">Cargando productos…</div></div>
+  <header class="sales-header">
+    <div class="brand"><img src="assets/smok-game-neon.jpg" alt="Smok Game"><span>SMOK GAME<small>PUNTO DE VENTA</small></span></div>
+    <div class="sales-user"><span id="sales-user">Cargando…</span><button id="sales-logout" class="secondary-btn">Cerrar sesión</button></div>
+  </header>
+
+  <main class="sales-wrap">
+    <div class="sales-title">
+      <div><p class="eyebrow">PUNTO DE VENTA</p><h1>Registrar venta</h1></div>
+      <span class="badge">● Sistema conectado</span>
+    </div>
+
+    <div class="sales-grid">
+      <section class="panel">
+        <h2>Detalle de la venta</h2>
+        <p class="panel-subtitle">Selecciona el producto y registra el pago.</p>
+        <form id="sale-form">
+          <div class="form-grid">
+            <div class="field field-full">
+              <label for="product-search">Producto</label>
+              <input id="product-search" list="products-list" placeholder="Buscar por nombre o código…" autocomplete="off" required>
+              <datalist id="products-list"></datalist>
+              <p class="inline-hint" id="product-hint">Escribe para buscar un producto disponible.</p>
+            </div>
+            <div class="field">
+              <label for="quantity">Cantidad</label>
+              <input id="quantity" type="number" min="1" step="1" value="1" required>
+            </div>
+            <div class="field">
+              <label for="unit-price">Precio unitario</label>
+              <input id="unit-price" value="Bs 0,00" readonly>
+            </div>
+            <div class="field field-full">
+              <label for="payment-method">Método de pago</label>
+              <select id="payment-method" required>
+                <option value="efectivo">Efectivo</option>
+                <option value="qr">QR</option>
+              </select>
+            </div>
+            <div class="field cash-fields show" id="cash-fields">
+              <label for="amount-received">Importe recibido (Bs)</label>
+              <input id="amount-received" type="number" min="0" step="0.01" placeholder="0,00">
+            </div>
+            <div class="field cash-fields show" id="change-field">
+              <label for="change-amount">Cambio (Bs)</label>
+              <input id="change-amount" value="Bs 0,00" readonly>
+            </div>
+          </div>
+        </form>
+      </section>
+
+      <aside class="panel summary-panel">
+        <h2>Resumen</h2>
+        <p class="panel-subtitle">Verifica los datos antes de confirmar.</p>
+        <div class="summary-row"><span>Producto</span><strong id="summary-product">—</strong></div>
+        <div class="summary-row"><span>Cantidad</span><strong id="summary-quantity">0</strong></div>
+        <div class="summary-row"><span>Pago</span><strong id="summary-payment">Efectivo</strong></div>
+        <div class="summary-total"><span>Total a cobrar</span><strong id="summary-total">Bs 0,00</strong></div>
+        <p class="payment-note" id="payment-note">En efectivo, registra el importe recibido para calcular el cambio.</p>
+        <button id="complete-sale" class="primary-btn checkout-btn" type="button">Confirmar venta</button>
+        <p id="sale-message" class="message" role="status" aria-live="polite"></p>
+      </aside>
+    </div>
+
+    <section class="panel history-panel">
+      <div class="history-head">
+        <div><h2>Ventas registradas</h2><p class="panel-subtitle" style="margin:6px 0 0">Últimas ventas guardadas en el sistema.</p></div>
+        <div class="history-actions"><input id="history-search" class="history-search" placeholder="Buscar venta…"><button id="export-csv" class="export-btn" type="button">Exportar CSV ↓</button></div>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>Fecha</th><th>N.º de venta</th><th>Método</th><th>Total</th><th>Estado</th></tr></thead>
+          <tbody id="sales-history"><tr><td colspan="5" class="empty-row">Cargando ventas…</td></tr></tbody>
+        </table>
+      </div>
+      <p id="history-message" class="message" role="status"></p>
     </section>
-    <aside class="cart-panel"><div class="panel-heading"><div><h2>Venta actual</h2><p class="muted">Añade productos al carrito</p></div><button id="clear-cart" class="icon-button" title="Vaciar carrito">×</button></div>
-      <div id="cart-items" class="cart-items"><div class="empty-state">Aún no hay productos.</div></div>
-      <div class="cart-footer"><div class="total-line"><span>Total</span><strong id="cart-total">Bs 0,00</strong></div><label for="payment-method">Método de pago</label><select id="payment-method"><option value="efectivo">Efectivo</option><option value="qr">QR</option><option value="tarjeta">Tarjeta</option><option value="transferencia">Transferencia</option><option value="otro">Otro</option></select><label for="amount-received" id="received-label">Importe recibido (Bs)</label><input id="amount-received" type="number" min="0" step="0.01" placeholder="0,00"><div class="total-line muted"><span>Cambio</span><strong id="change-amount">Bs 0,00</strong></div><button id="complete-sale" class="primary-btn checkout-btn">Confirmar venta</button><p id="sale-message" role="status" class="small"></p></div>
-    </aside>
   </main>
   <script type="module" src="assets/js/sales.js"></script>
 </body>
