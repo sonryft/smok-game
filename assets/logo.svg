@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 220" role="img" aria-label="Smok Game">
+  <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#d9d9d9"/><stop offset="1" stop-color="#747474"/></linearGradient></defs>
+  <rect width="220" height="220" rx="46" fill="#111"/>
+  <path d="M48 66 L110 34 L172 66 L172 143 L110 179 L48 143 Z" fill="none" stroke="url(#g)" stroke-width="7"/>
+  <path d="M78 86 Q110 62 142 86 L130 101 Q110 87 92 102 Q80 114 99 122 L125 131 Q151 143 136 162 Q114 182 77 159 L88 143 Q111 159 124 147 Q131 138 113 132 L89 124 Q60 112 78 86Z" fill="#f3f3f3"/>
+</svg>

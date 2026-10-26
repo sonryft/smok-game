@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Panel · Smok Game</title><link rel="stylesheet" href="assets/css/app.css">
+</head>
+<body data-page="dashboard">
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand" href="app.html"><img src="assets/smok-game-neon.jpg" alt=""><span>SMOK GAME</span></a>
+      <div class="sidebar-label">MENÚ PRINCIPAL</div>
+      <nav id="main-nav">
+        <a href="app.html" data-section="dashboard">▦ <span>Resumen</span></a>
+        <a href="sales.html" data-section="sales">🛒 <span>Ventas</span></a>
+        <a href="app.html#cash" data-section="cash">▣ <span>Caja y arqueo</span></a>
+        <a href="app.html#inventory" data-section="inventory">▤ <span>Inventario</span></a>
+        <a href="app.html#reports" data-section="reports">▥ <span>Reportes</span></a>
+      </nav>
+      <div class="sidebar-bottom">
+        <a href="app.html#settings" data-section="settings">⚙ <span>Configuración</span></a>
+        <button id="logout-btn" class="nav-button">↪ <span>Cerrar sesión</span></button>
+      </div>
+    </aside>
+    <main class="main-content">
+      <header class="topbar"><div><p class="eyebrow">SMOK GAME / GESTIÓN</p><h1 id="page-title">Resumen</h1></div><div class="user-chip"><span class="status-dot"></span><span id="current-user">Cargando…</span></div></header>
+      <section id="section-dashboard" class="content-section">
+        <div class="welcome"><div><p class="eyebrow">PANEL GENERAL</p><h2>Resumen del negocio</h2><p class="muted">Indicadores conectados a las operaciones de Smok Game.</p></div><span class="badge">En línea</span></div>
+        <div class="metric-grid">
+          <article class="metric-card"><span>Ventas de hoy</span><strong id="metric-sales">Bs 0,00</strong><small>Según ventas registradas</small></article>
+          <article class="metric-card"><span>Número de ventas</span><strong id="metric-count">0</strong><small>Operaciones de hoy</small></article>
+          <article class="metric-card"><span>Estado de caja</span><strong id="metric-cash">Sin datos</strong><small>Estado de la jornada</small></article>
+          <article class="metric-card"><span>Productos</span><strong id="metric-products">0</strong><small>Productos registrados</small></article>
+        </div>
+        <article class="panel"><div class="panel-heading"><div><h3>Actividad reciente</h3><p class="muted">Últimas operaciones registradas</p></div><a class="text-link" href="sales.html">Ir a ventas →</a></div><div id="recent-activity" class="empty-state">Conectando con la base de datos…</div></article>
+      </section>
+      <section id="section-cash" class="content-section hidden"><div class="welcome"><div><p class="eyebrow">OPERACIONES</p><h2>Caja y arqueo</h2><p class="muted">Aperturas, movimientos, cierres y diferencias.</p></div></div><article class="panel"><p>El módulo de caja se activará conectado a las tablas y permisos definidos en Supabase.</p></article></section>
+      <section id="section-inventory" class="content-section hidden"><div class="welcome"><div><p class="eyebrow">CATÁLOGO</p><h2>Inventario</h2><p class="muted">Productos, existencias y movimientos.</p></div></div><article class="panel"><p>El módulo de inventario se conectará a la base de datos de Smok Game.</p></article></section>
+      <section id="section-reports" class="content-section hidden"><div class="welcome"><div><p class="eyebrow">ANÁLISIS</p><h2>Reportes</h2><p class="muted">Ventas, métodos de pago, cierres y existencias.</p></div></div><article class="panel"><p>Los reportes se calcularán a partir de los datos reales registrados.</p></article></section>
+      <section id="section-settings" class="content-section hidden"><div class="welcome"><div><p class="eyebrow">PERSONALIZACIÓN</p><h2>Configuración</h2><p class="muted">Apariencia y administración de usuarios.</p></div></div>
+        <article class="panel"><div class="panel-heading"><div><h3>Apariencia</h3><p class="muted">El tema se guarda en este dispositivo.</p></div></div><div class="theme-grid">
+          <button class="theme-option" data-theme="tierra"><i class="swatch tierra"></i><span>Tierra</span></button>
+          <button class="theme-option" data-theme="carbon"><i class="swatch carbon"></i><span>Carbón</span></button>
+          <button class="theme-option" data-theme="rosa"><i class="swatch rosa"></i><span>Rosa</span></button>
+          <button class="theme-option" data-theme="bosque"><i class="swatch bosque"></i><span>Bosque</span></button>
+          <button class="theme-option" data-theme="oceano"><i class="swatch oceano"></i><span>Océano</span></button>
+          <button class="theme-option" data-theme="nieve"><i class="swatch nieve"></i><span>Nieve</span></button>
+        </div></article>
+        <article class="panel" id="users-panel"><div class="panel-heading"><div><h3>Usuarios y permisos</h3><p class="muted">Crea cuentas y asigna permisos individuales.</p></div><button id="new-user-btn" class="primary-btn compact">＋ Crear usuario</button></div><div id="users-table-wrap" class="table-wrap"><p class="muted">Cargando usuarios…</p></div>
+          <div id="user-form-wrap" class="hidden">
+            <form id="user-form" class="user-form"><h3>Nuevo trabajador</h3><label>Nombre completo<input name="full_name" required></label><label>Nombre de usuario<input name="username" pattern="[a-zA-Z0-9._-]{3,32}" required></label><label>Contraseña inicial<input name="password" type="password" minlength="10" required></label>
+            <p class="muted small">La contraseña debe tener al menos 10 caracteres. No se podrá consultar después de crear la cuenta; podrás restablecerla.</p>
+            <div id="permission-list" class="permission-grid"></div><p id="user-form-error" class="error"></p><div class="form-actions"><button type="button" id="cancel-user-btn" class="secondary-btn">Cancelar</button><button class="primary-btn" type="submit">Crear usuario</button></div></form>
+          </div>
+        </article>
+      </section>
+    </main>
+  </div>
+  <script type="module" src="assets/js/app.js"></script>
+</body>
+</html>

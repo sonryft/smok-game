@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Iniciar sesión · Smok Game</title><link rel="stylesheet" href="assets/css/app.css">
+</head>
+<body class="login-body">
+  <main class="login-card">
+    <img class="login-logo" src="assets/smok-game-neon.jpg" alt="Smok Game">
+    <p class="eyebrow">SISTEMA DE GESTIÓN</p><h1>Iniciar sesión</h1>
+    <form id="login-form">
+      <label for="username">Usuario</label><input id="username" name="username" autocomplete="username" required>
+      <label for="password">Contraseña</label><input id="password" name="password" type="password" autocomplete="current-password" required>
+      <p id="login-error" class="error" role="alert"></p>
+      <button class="primary-btn" type="submit">Entrar</button>
+    </form>
+    <p class="muted small">Acceso exclusivo para personal autorizado.</p>
+  </main>
+  <script type="module" src="assets/js/login.js"></script>
+</body>
+</html>
