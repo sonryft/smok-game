@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#090909">
+  <title>Inventario · Smok Game</title>
+  <link rel="stylesheet" href="assets/css/app.css">
+  <style>
+    :root{--sg-bg:#090909;--sg-panel:#121412;--sg-line:#292d29;--sg-text:#f4f7f2;--sg-muted:#9aa39a;--sg-green:#b7ff35;--sg-red:#ff6666}
+    body.inventory-body{margin:0;background:var(--sg-bg);color:var(--sg-text);font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    .inv-header{min-height:70px;padding:0 clamp(15px,4vw,42px);display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:1px solid var(--sg-line);background:#0d0f0d}
+    .brand{display:flex;align-items:center;gap:11px;font-weight:800;letter-spacing:.08em}.brand img{width:38px;height:38px;object-fit:contain;border-radius:8px}.brand small{display:block;color:var(--sg-muted);font-size:10px;letter-spacing:.12em;margin-top:3px}
+    .user-area{display:flex;align-items:center;gap:12px;color:var(--sg-muted);font-size:12px}
+    .inv-wrap{max-width:1450px;margin:auto;padding:28px clamp(14px,3vw,36px) 50px}
+    .page-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:22px}.eyebrow{font-size:11px;letter-spacing:.18em;color:var(--sg-green);font-weight:800;margin:0 0 8px}.page-heading h1{font-size:clamp(26px,3vw,36px);margin:0;letter-spacing:-.04em}.badge{border:1px solid #3d5523;background:#18220e;color:var(--sg-green);padding:8px 12px;border-radius:999px;font-size:11px;font-weight:700}
+    .stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-bottom:18px}.stat,.panel{background:var(--sg-panel);border:1px solid var(--sg-line);border-radius:15px}.stat{padding:18px 20px}.stat span{display:block;color:var(--sg-muted);font-size:12px;margin-bottom:9px}.stat strong{font-size:25px;letter-spacing:-.04em}.stat strong.green{color:var(--sg-green)}
+    .panel{padding:22px;margin-bottom:18px}.panel-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:18px}.panel h2{font-size:17px;margin:0 0 5px}.sub{font-size:12px;color:var(--sg-muted);margin:0;line-height:1.5}
+    .form-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.field{display:flex;flex-direction:column;gap:7px;min-width:0}.field label{font-size:12px;color:#cbd1c8;font-weight:650}.field input,.field select,.field textarea{box-sizing:border-box;width:100%;min-height:43px;border:1px solid #353b35;background:#0b0d0b;color:var(--sg-text);border-radius:9px;padding:10px 12px;font:inherit;font-size:13px;outline:none}.field input:focus,.field select:focus{border-color:var(--sg-green);box-shadow:0 0 0 2px #b7ff351c}.field input[readonly]{color:var(--sg-muted)}.span-2{grid-column:span 2}.form-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:17px}
+    .btn{border:0;border-radius:9px;padding:12px 16px;font-weight:800;font-size:12px;cursor:pointer}.btn-primary{background:var(--sg-green);color:#11170a}.btn-secondary{background:#202420;color:var(--sg-text);border:1px solid #353b35}.btn:disabled{opacity:.5;cursor:not-allowed}
+    .toolbar{display:flex;gap:10px;align-items:center}.search{width:min(300px,45vw);min-height:39px;box-sizing:border-box;border:1px solid #353b35;background:#0b0d0b;color:var(--sg-text);border-radius:9px;padding:9px 12px;font-size:12px}
+    .table-scroll{overflow:auto;border:1px solid var(--sg-line);border-radius:10px}table{border-collapse:collapse;width:100%;min-width:760px;text-align:left}th,td{padding:13px 14px;border-bottom:1px solid var(--sg-line);font-size:12px;white-space:nowrap}th{background:#191c19;color:var(--sg-muted);font-size:10px;letter-spacing:.08em;text-transform:uppercase}tbody tr:last-child td{border-bottom:0}tbody tr:hover{background:#171a17}.stock-pill{display:inline-flex;padding:5px 8px;border-radius:99px;background:#19230f;color:var(--sg-green);font-size:10px;font-weight:800}.stock-low{background:#2a1d0b;color:#ffbf69}.stock-out{background:#301515;color:#ff7777}.row-btn{background:transparent;color:var(--sg-green);border:1px solid #3d5523;border-radius:7px;padding:6px 9px;font-size:11px;cursor:pointer}.row-btn + .row-btn{margin-left:5px}.message{font-size:12px;line-height:1.5;margin:12px 0 0;min-height:18px}.ok{color:var(--sg-green)}.error{color:var(--sg-red)}.empty{text-align:center;color:var(--sg-muted);padding:28px}
+    @media(max-width:900px){.form-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.stats{gap:10px}.stat{padding:15px}}
+    @media(max-width:560px){.inv-header{min-height:62px}.brand{font-size:12px;gap:8px}.brand img{width:31px;height:31px}.brand small{font-size:8px}.user-area{gap:7px;font-size:10px}.user-area .btn{padding:9px;font-size:10px}.inv-wrap{padding-top:20px}.page-heading{align-items:flex-start}.badge{display:none}.stats{grid-template-columns:1fr}.stat strong{font-size:22px}.panel{padding:16px}.form-grid{grid-template-columns:1fr}.span-2{grid-column:auto}.panel-head{flex-direction:column}.toolbar{width:100%}.search{width:100%;flex:1}.form-actions{flex-direction:column-reverse}.form-actions .btn{width:100%}}
+  </style>
+</head>
+<body class="inventory-body" data-page="inventory">
+  <header class="inv-header">
+    <div class="brand"><img src="assets/smok-game-neon.jpg" alt="Smok Game"><span>SMOK GAME<small>GESTIÓN DE INVENTARIO</small></span></div>
+    <div class="user-area"><span id="inventory-user">Cargando…</span><button id="inventory-logout" class="btn btn-secondary">Cerrar sesión</button></div>
+  </header>
+
+  <main class="inv-wrap">
+    <div class="page-heading">
+      <div><p class="eyebrow">CONTROL DE EXISTENCIAS</p><h1>Inventario</h1></div>
+      <span class="badge">● Base de datos conectada</span>
+    </div>
+
+    <section class="stats">
+      <article class="stat"><span>Productos registrados</span><strong id="stat-products">—</strong></article>
+      <article class="stat"><span>Unidades en stock</span><strong id="stat-units" class="green">—</strong></article>
+      <article class="stat"><span>Productos con stock bajo</span><strong id="stat-low">—</strong></article>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head"><div><h2 id="form-title">Agregar producto</h2><p class="sub">Registra productos y sus existencias iniciales.</p></div></div>
+      <form id="product-form">
+        <input id="product-id" type="hidden">
+        <div class="form-grid">
+          <div class="field span-2"><label for="product-name">Nombre del producto *</label><input id="product-name" maxlength="140" required placeholder="Ej. Audífonos inalámbricos"></div>
+          <div class="field"><label for="product-sku">Código / SKU</label><input id="product-sku" maxlength="80" placeholder="Ej. AUD-001"></div>
+          <div class="field"><label for="product-category">Categoría</label><input id="product-category" maxlength="100" placeholder="Ej. Accesorios"></div>
+          <div class="field"><label for="product-cost">Precio de compra (Bs)</label><input id="product-cost" type="number" min="0" step="0.01" value="0" required></div>
+          <div class="field"><label for="product-price">Precio de venta (Bs) *</label><input id="product-price" type="number" min="0.01" step="0.01" required placeholder="0.00"></div>
+          <div class="field"><label for="product-stock">Stock inicial *</label><input id="product-stock" type="number" min="0" step="1" value="0" required></div>
+          <div class="field"><label for="product-minimum">Stock mínimo</label><input id="product-minimum" type="number" min="0" step="1" value="3" required></div>
+        </div>
+        <div class="form-actions"><button type="button" id="cancel-edit" class="btn btn-secondary" hidden>Cancelar edición</button><button type="submit" id="save-product" class="btn btn-primary">Guardar producto</button></div>
+        <p id="form-message" class="message" role="status" aria-live="polite"></p>
+      </form>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div><h2>Productos</h2><p class="sub">Consulta precios y existencias disponibles.</p></div>
+        <div class="toolbar"><input id="inventory-search" class="search" placeholder="Buscar por nombre, código o categoría…"></div>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>Producto</th><th>Código</th><th>Categoría</th><th>Compra</th><th>Venta</th><th>Stock</th><th>Estado</th><th>Acciones</th></tr></thead>
+          <tbody id="inventory-rows"><tr><td colspan="8" class="empty">Cargando inventario…</td></tr></tbody>
+        </table>
+      </div>
+      <p id="list-message" class="message" role="status"></p>
+    </section>
+  </main>
+  <script type="module" src="assets/js/inventory.js"></script>
+</body>
+</html>
