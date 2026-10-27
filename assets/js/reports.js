@@ -84,6 +84,8 @@ function dateLabel(value) {
 }
 
 function setMessage(message, isError = false) {
+  if (!messageEl) return;
+
   messageEl.textContent = message;
   messageEl.classList.toggle("report-error", isError);
 }
@@ -135,7 +137,7 @@ function getDateRange() {
   const start = new Date(`${from}T00:00:00`);
   const end = new Date(`${to}T00:00:00`);
 
-  // Incluir todo el día final.
+  // Incluye todo el día final.
   end.setDate(end.getDate() + 1);
 
   return {
@@ -145,7 +147,7 @@ function getDateRange() {
 }
 
 // ========================================
-// CONSULTAS A SUPABASE
+// CONSULTAR VENTAS
 // ========================================
 
 async function loadSales(range) {
@@ -162,17 +164,20 @@ async function loadSales(range) {
     );
   }
 
-  // Solo contabilizar ventas completadas.
   return (data || []).filter(
     (sale) =>
       String(sale.status || "").toLowerCase() === "completed"
   );
 }
 
+// ========================================
+// CONSULTAR INVENTARIO
+// ========================================
+
 async function loadProducts() {
   const { data, error } = await supabase
     .from("products")
-    .select("id,name,stock,min_stock,cost_price,sale_price,is_active")
+    .select("id,name,stock,min_stock,is_active")
     .eq("is_active", true)
     .order("name");
 
@@ -185,13 +190,22 @@ async function loadProducts() {
   return data || [];
 }
 
+// ========================================
+// HISTORIAL DE CIERRES
+// ========================================
+
 async function loadClosures(range) {
+  // Solo administración puede consultar los importes del arqueo.
+  if (profile.role !== "admin") {
+    return [];
+  }
+
+  // Usamos la vista administrativa, no la tabla protegida.
   const { data, error } = await supabase
-    .from("cash_shifts")
+    .from("admin_cash_closures")
     .select(
-      "id,opened_at,closed_at,expected_cash,counted_cash,difference,status"
+      "opened_at,closed_at,expected_cash,counted_cash,difference,status"
     )
-    .not("closed_at", "is", null)
     .gte("closed_at", range.from)
     .lt("closed_at", range.to)
     .order("closed_at", { ascending: false })
@@ -284,7 +298,7 @@ async function renderTopProducts(sales) {
   const totals = new Map();
   const saleIds = sales.map((sale) => sale.id);
 
-  // Consultar los detalles de venta en grupos de 100.
+  // Consultar detalles en grupos de 100 ventas.
   for (let index = 0; index < saleIds.length; index += 100) {
     const batch = saleIds.slice(index, index + 100);
 
@@ -303,7 +317,6 @@ async function renderTopProducts(sales) {
       const productId = String(item.product_id);
       const quantity = numeric(item.quantity);
 
-      // Se contemplan varios nombres posibles para el precio.
       const unitPrice = numeric(
         item.unit_price ?? item.sale_price ?? item.price
       );
@@ -367,7 +380,7 @@ async function renderTopProducts(sales) {
 }
 
 // ========================================
-// HISTORIAL DE CIERRES
+// MOSTRAR HISTORIAL DE CIERRES
 // ========================================
 
 function renderClosures(closures) {
@@ -385,12 +398,14 @@ function renderClosures(closures) {
       `
     ),
     5,
-    "No hay cierres registrados en este período."
+    profile.role === "admin"
+      ? "No hay cierres registrados en este período."
+      : "El historial de arqueos está reservado para administración."
   );
 }
 
 // ========================================
-// CARGA DEL REPORTE
+// CARGAR REPORTE
 // ========================================
 
 async function loadReport() {
@@ -438,7 +453,7 @@ async function loadReport() {
 }
 
 // ========================================
-// EXPORTACIÓN CSV
+// EXPORTAR VENTAS A CSV
 // ========================================
 
 function exportSalesCsv() {
