@@ -102,13 +102,13 @@ async function loadCashStatus() {
   const amountInput = $("#seller-opening-amount");
   const openButton = $("#seller-open-btn");
 
-  const { data, error } = await supabase
-    .from("cash_shifts")
-    .select("id, opened_by, opened_at")
-    .eq("status", "open")
-    .order("opened_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const { data: shift, error: shiftError } = await supabase
+  .from("cash_shifts")
+  .select("id, opened_by, status")
+  .eq("status", "open")
+  .order("opened_at", { ascending: false })
+  .limit(1)
+  .maybeSingle();
 
   if (error) {
     console.error("Error consultando caja:", error);
