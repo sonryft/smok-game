@@ -21,9 +21,13 @@ const fromEl = $("#date-from");
 const toEl = $("#date-to");
 const messageEl = $("#report-message");
 const exportBtn = $("#export-sales");
+const exportProductsBtn = $("#export-products");
+const exportMovementsBtn = $("#export-movements");
 const applyBtn = $("#apply-filter");
 
 let salesCache = [];
+let productsCache = [];
+let movementsCache = [];
 let busy = false;
 
 // ========================================
@@ -71,6 +75,25 @@ function paymentLabel(method) {
   if (value === "qr") return "QR";
 
   return value || "Otro";
+}
+
+function movementLabel(type) {
+  const value = String(type || "").toLowerCase();
+
+  const labels = {
+    sale: "Salida por venta",
+    entry: "Entrada",
+    purchase: "Entrada por compra",
+    restock: "Reposición",
+    adjustment: "Ajuste",
+    loss: "Pérdida",
+    return: "Devolución",
+    return_in: "Devolución recibida",
+    return_out: "Devolución de salida",
+    damage: "Producto dañado"
+  };
+
+  return labels[value] || value || "Movimiento";
 }
 
 function dateLabel(value) {
@@ -171,7 +194,7 @@ async function loadSales(range) {
 }
 
 // ========================================
-// CONSULTAR INVENTARIO
+// CONSULTAR INVENTARIO ACTUAL
 // ========================================
 
 async function loadProducts() {
@@ -191,6 +214,185 @@ async function loadProducts() {
 }
 
 // ========================================
+// PRODUCTOS REGISTRADOS EN EL PERÍODO
+// ========================================
+
+async function loadRegisteredProducts(range) {
+  const { data, error } = await supabase
+    .from("products")
+    .select("id,name,category,stock,created_at,created_by")
+    .gte("created_at", range.from)
+    .lt("created_at", range.to)
+    .order("created_at", { ascending: false })
+    .limit(1000);
+
+  if (error) {
+    throw new Error(
+      `No se pudieron cargar los productos registrados: ${error.message}`
+    );
+  }
+
+  const products = data || [];
+  const userIds = [
+    ...new Set(
+      products
+        .map((product) => product.created_by)
+        .filter(Boolean)
+    )
+  ];
+
+  const users = await loadUsers(userIds);
+
+  return products.map((product) => ({
+    ...product,
+    responsible:
+      users.get(String(product.created_by)) || "Usuario no disponible"
+  }));
+}
+
+// ========================================
+// CONSULTAR NOMBRES DE USUARIOS
+// ========================================
+
+async function loadUsers(userIds) {
+  const users = new Map();
+
+  // El usuario actual puede consultar su propio perfil.
+  users.set(
+    String(profile.id),
+    profile.full_name || profile.username || "Usuario"
+  );
+
+  if (!userIds.length) {
+    return users;
+  }
+
+  // No se presupone que un trabajador pueda leer los perfiles ajenos.
+  // Si la política lo permite, se completan los nombres.
+  const otherIds = userIds.filter(
+    (id) => String(id) !== String(profile.id)
+  );
+
+  if (!otherIds.length) {
+    return users;
+  }
+
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id,full_name,username")
+    .in("id", otherIds);
+
+  if (error) {
+    console.warn(
+      "Algunos nombres de responsables no están disponibles:",
+      error.message
+    );
+
+    return users;
+  }
+
+  for (const user of data || []) {
+    users.set(
+      String(user.id),
+      user.full_name || user.username || "Usuario"
+    );
+  }
+
+  return users;
+}
+
+// ========================================
+// MOVIMIENTOS DE INVENTARIO
+// ========================================
+
+async function loadInventoryMovements(range) {
+  const { data, error } = await supabase
+    .from("inventory_movements")
+    .select(`
+      product_id,
+      movement_type,
+      quantity_change,
+      stock_before,
+      stock_after,
+      reference_id,
+      note,
+      created_by,
+      created_at
+    `)
+    .gte("created_at", range.from)
+    .lt("created_at", range.to)
+    .order("created_at", { ascending: false })
+    .limit(2000);
+
+  if (error) {
+    throw new Error(
+      `No se pudieron cargar los movimientos de inventario: ${error.message}`
+    );
+  }
+
+  const movements = data || [];
+
+  const productIds = [
+    ...new Set(
+      movements
+        .map((movement) => movement.product_id)
+        .filter(Boolean)
+    )
+  ];
+
+  const userIds = [
+    ...new Set(
+      movements
+        .map((movement) => movement.created_by)
+        .filter(Boolean)
+    )
+  ];
+
+  const [productNames, users] = await Promise.all([
+    loadProductNames(productIds),
+    loadUsers(userIds)
+  ]);
+
+  return movements.map((movement) => ({
+    ...movement,
+    product_name:
+      productNames.get(String(movement.product_id)) ||
+      "Producto no disponible",
+    responsible:
+      users.get(String(movement.created_by)) ||
+      "Usuario no disponible"
+  }));
+}
+
+async function loadProductNames(productIds) {
+  const names = new Map();
+
+  if (!productIds.length) {
+    return names;
+  }
+
+  const { data, error } = await supabase
+    .from("products")
+    .select("id,name")
+    .in("id", productIds);
+
+  if (error) {
+    console.warn(
+      "No se pudieron consultar algunos nombres de productos:",
+      error.message
+    );
+
+    return names;
+  }
+
+  for (const product of data || []) {
+    names.set(String(product.id), product.name);
+  }
+
+  return names;
+}
+
+// ========================================
 // HISTORIAL DE CIERRES
 // ========================================
 
@@ -200,7 +402,6 @@ async function loadClosures(range) {
     return [];
   }
 
-  // Usamos la vista administrativa, no la tabla protegida.
   const { data, error } = await supabase
     .from("admin_cash_closures")
     .select(
@@ -281,6 +482,61 @@ function renderProducts(products) {
 }
 
 // ========================================
+// MOSTRAR PRODUCTOS REGISTRADOS
+// ========================================
+
+function renderRegisteredProducts(products) {
+  showRows(
+    "#registered-products",
+    products.map(
+      (product) => `
+        <tr>
+          <td>${escapeHtml(dateLabel(product.created_at))}</td>
+          <td>${escapeHtml(product.name)}</td>
+          <td>${escapeHtml(product.category || "—")}</td>
+          <td>${numeric(product.stock)}</td>
+          <td>${escapeHtml(product.responsible)}</td>
+        </tr>
+      `
+    ),
+    5,
+    "No se registraron productos nuevos en este período."
+  );
+}
+
+// ========================================
+// MOSTRAR MOVIMIENTOS DE INVENTARIO
+// ========================================
+
+function renderInventoryMovements(movements) {
+  showRows(
+    "#inventory-movements",
+    movements.map((movement) => {
+      const quantity = numeric(movement.quantity_change);
+
+      return `
+        <tr>
+          <td>${escapeHtml(dateLabel(movement.created_at))}</td>
+          <td>${escapeHtml(movement.product_name)}</td>
+          <td>${escapeHtml(movementLabel(movement.movement_type))}</td>
+          <td>${quantity > 0 ? "+" : ""}${quantity}</td>
+          <td>${movement.stock_before == null
+            ? "—"
+            : numeric(movement.stock_before)}</td>
+          <td>${movement.stock_after == null
+            ? "—"
+            : numeric(movement.stock_after)}</td>
+          <td>${escapeHtml(movement.responsible)}</td>
+          <td>${escapeHtml(movement.note || "—")}</td>
+        </tr>
+      `;
+    }),
+    8,
+    "No hay movimientos de inventario en este período."
+  );
+}
+
+// ========================================
 // PRODUCTOS MÁS VENDIDOS
 // ========================================
 
@@ -298,7 +554,6 @@ async function renderTopProducts(sales) {
   const totals = new Map();
   const saleIds = sales.map((sale) => sale.id);
 
-  // Consultar detalles en grupos de 100 ventas.
   for (let index = 0; index < saleIds.length; index += 100) {
     const batch = saleIds.slice(index, index + 100);
 
@@ -405,75 +660,13 @@ function renderClosures(closures) {
 }
 
 // ========================================
-// CARGAR REPORTE
+// EXPORTAR CSV
 // ========================================
 
-async function loadReport() {
-  if (busy) return;
-
-  busy = true;
-  applyBtn.disabled = true;
-  exportBtn.disabled = true;
-
-  setMessage("Consultando datos de Supabase…");
-
-  try {
-    const range = getDateRange();
-
-    const [sales, products, closures] = await Promise.all([
-      loadSales(range),
-      loadProducts(),
-      loadClosures(range)
-    ]);
-
-    salesCache = sales;
-
-    renderSales(sales);
-    renderProducts(products);
-    renderClosures(closures);
-
-    await renderTopProducts(sales);
-
-    setMessage(
-      `Reporte actualizado correctamente: ${sales.length} ventas y ${products.length} productos activos.`
-    );
-
-    exportBtn.disabled = sales.length === 0;
-  } catch (error) {
-    console.error("Error al cargar reportes:", error);
-
-    setMessage(
-      error.message || "No se pudo cargar el reporte.",
-      true
-    );
-  } finally {
-    busy = false;
-    applyBtn.disabled = false;
-  }
-}
-
-// ========================================
-// EXPORTAR VENTAS A CSV
-// ========================================
-
-function exportSalesCsv() {
-  if (!salesCache.length) {
-    setMessage("No hay ventas para exportar.", true);
-    return;
-  }
-
+function downloadCsv(filename, headers, records) {
   const rows = [
-    ["Fecha", "ID de venta", "Método de pago", "Total Bs", "Estado"],
-
-    ...salesCache.map((sale) => [
-      sale.created_at
-        ? new Date(sale.created_at).toLocaleString("es-BO")
-        : "",
-      sale.id,
-      paymentLabel(sale.payment_method),
-      numeric(sale.total).toFixed(2),
-      sale.status || ""
-    ])
+    headers,
+    ...records
   ];
 
   const csv =
@@ -498,14 +691,161 @@ function exportSalesCsv() {
   const link = document.createElement("a");
 
   link.href = url;
-  link.download =
-    `smok-game-reporte-${fromEl.value}-${toEl.value}.csv`;
+  link.download = filename;
 
   document.body.appendChild(link);
   link.click();
   link.remove();
 
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function exportSalesCsv() {
+  if (!salesCache.length) {
+    setMessage("No hay ventas para exportar.", true);
+    return;
+  }
+
+  downloadCsv(
+    `smok-game-ventas-${fromEl.value}-${toEl.value}.csv`,
+    ["Fecha", "ID de venta", "Método de pago", "Total Bs", "Estado"],
+    salesCache.map((sale) => [
+      sale.created_at
+        ? new Date(sale.created_at).toLocaleString("es-BO")
+        : "",
+      sale.id,
+      paymentLabel(sale.payment_method),
+      numeric(sale.total).toFixed(2),
+      sale.status || ""
+    ])
+  );
+}
+
+function exportProductsCsv() {
+  if (!productsCache.length) {
+    setMessage("No hay productos registrados para exportar.", true);
+    return;
+  }
+
+  downloadCsv(
+    `smok-game-productos-${fromEl.value}-${toEl.value}.csv`,
+    [
+      "Fecha de registro",
+      "Producto",
+      "Categoría",
+      "Stock actual",
+      "Responsable"
+    ],
+    productsCache.map((product) => [
+      product.created_at
+        ? new Date(product.created_at).toLocaleString("es-BO")
+        : "",
+      product.name,
+      product.category || "",
+      numeric(product.stock),
+      product.responsible
+    ])
+  );
+}
+
+function exportMovementsCsv() {
+  if (!movementsCache.length) {
+    setMessage("No hay movimientos para exportar.", true);
+    return;
+  }
+
+  downloadCsv(
+    `smok-game-movimientos-${fromEl.value}-${toEl.value}.csv`,
+    [
+      "Fecha",
+      "Producto",
+      "Movimiento",
+      "Cantidad",
+      "Stock anterior",
+      "Stock posterior",
+      "Responsable",
+      "Observación"
+    ],
+    movementsCache.map((movement) => [
+      movement.created_at
+        ? new Date(movement.created_at).toLocaleString("es-BO")
+        : "",
+      movement.product_name,
+      movementLabel(movement.movement_type),
+      numeric(movement.quantity_change),
+      movement.stock_before ?? "",
+      movement.stock_after ?? "",
+      movement.responsible,
+      movement.note || ""
+    ])
+  );
+}
+
+// ========================================
+// CARGAR REPORTE
+// ========================================
+
+async function loadReport() {
+  if (busy) return;
+
+  busy = true;
+  applyBtn.disabled = true;
+  exportBtn.disabled = true;
+  exportProductsBtn.disabled = true;
+  exportMovementsBtn.disabled = true;
+
+  setMessage("Consultando datos de Supabase…");
+
+  try {
+    const range = getDateRange();
+
+    const [
+      sales,
+      products,
+      closures,
+      registeredProducts,
+      movements
+    ] = await Promise.all([
+      loadSales(range),
+      loadProducts(),
+      loadClosures(range),
+      loadRegisteredProducts(range),
+      loadInventoryMovements(range)
+    ]);
+
+    salesCache = sales;
+    productsCache = registeredProducts;
+    movementsCache = movements;
+
+    renderSales(sales);
+    renderProducts(products);
+    renderClosures(closures);
+    renderRegisteredProducts(registeredProducts);
+    renderInventoryMovements(movements);
+
+    await renderTopProducts(sales);
+
+    setMessage(
+      `Reporte actualizado: ${sales.length} ventas, ` +
+      `${products.length} productos activos, ` +
+      `${registeredProducts.length} productos registrados y ` +
+      `${movements.length} movimientos de inventario.`
+    );
+
+    exportBtn.disabled = sales.length === 0;
+    exportProductsBtn.disabled = registeredProducts.length === 0;
+    exportMovementsBtn.disabled = movements.length === 0;
+  } catch (error) {
+    console.error("Error al cargar reportes:", error);
+
+    setMessage(
+      error.message || "No se pudo cargar el reporte.",
+      true
+    );
+  } finally {
+    busy = false;
+    applyBtn.disabled = false;
+  }
 }
 
 // ========================================
@@ -525,5 +865,7 @@ toEl.value = localDateInput(today);
 
 applyBtn.addEventListener("click", loadReport);
 exportBtn.addEventListener("click", exportSalesCsv);
+exportProductsBtn.addEventListener("click", exportProductsCsv);
+exportMovementsBtn.addEventListener("click", exportMovementsCsv);
 
 await loadReport();
