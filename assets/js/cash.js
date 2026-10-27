@@ -58,6 +58,24 @@ function escapeHtml(value) {
   }[character]));
 }
 
+function formatDate(value) {
+  if (!value) return "—";
+
+  const date = new Date(value);
+
+  return Number.isNaN(date.getTime())
+    ? "—"
+    : date.toLocaleString("es-BO");
+}
+
+function formatUser(name, id) {
+  if (name && String(name).trim()) {
+    return String(name).trim();
+  }
+
+  return id ? "Usuario sin nombre" : "No registrado";
+}
+
 function setFormPermissions() {
   $("#cash-open-form")
     .querySelectorAll("input, button")
@@ -120,9 +138,7 @@ async function loadShift() {
   shift = data || null;
 
   $("#cash-status-title").textContent = shift
-    ? `Caja abierta desde ${
-        new Date(shift.opened_at).toLocaleString("es-BO")
-      }`
+    ? `Caja abierta desde ${formatDate(shift.opened_at)}`
     : "Caja cerrada";
 
   $("#cash-opening").textContent =
@@ -242,9 +258,7 @@ async function loadMovements() {
   body.innerHTML = movements.length
     ? movements.map(movement => `
         <tr>
-          <td>${escapeHtml(
-            new Date(movement.created_at).toLocaleString("es-BO")
-          )}</td>
+          <td>${escapeHtml(formatDate(movement.created_at))}</td>
           <td>${escapeHtml(movement.movement_type)}</td>
           <td>${escapeHtml(movement.payment_method || "—")}</td>
           <td>${escapeHtml(money(movement.amount))}</td>
@@ -260,36 +274,50 @@ async function loadClosures() {
 
   if (!isAdmin) {
     body.innerHTML =
-      '<tr><td colspan="6">Historial reservado para administración.</td></tr>';
+      '<tr><td colspan="8">Historial reservado para administración.</td></tr>';
     return;
   }
 
   const { data, error } = await supabase
     .from("admin_cash_closures")
-    .select(
-      "opened_at,closed_at,expected_cash,counted_cash,difference,status"
-    )
+    .select(`
+      opened_by,
+      opened_by_name,
+      opened_at,
+      opening_amount,
+      closed_by,
+      closed_by_name,
+      closed_at,
+      expected_cash,
+      counted_cash,
+      difference,
+      status
+    `)
     .order("closed_at", { ascending: false })
-    .limit(20);
+    .limit(50);
 
   if (error) throw error;
 
   body.innerHTML = data?.length
     ? data.map(closure => `
         <tr>
-          <td>${escapeHtml(
-            new Date(closure.opened_at).toLocaleString("es-BO")
-          )}</td>
-          <td>${escapeHtml(
-            new Date(closure.closed_at).toLocaleString("es-BO")
-          )}</td>
+          <td>${escapeHtml(formatDate(closure.opened_at))}</td>
+          <td>${escapeHtml(formatUser(
+            closure.opened_by_name,
+            closure.opened_by
+          ))}</td>
+          <td>${escapeHtml(money(closure.opening_amount))}</td>
+          <td>${escapeHtml(formatDate(closure.closed_at))}</td>
+          <td>${escapeHtml(formatUser(
+            closure.closed_by_name,
+            closure.closed_by
+          ))}</td>
           <td>${escapeHtml(money(closure.expected_cash))}</td>
           <td>${escapeHtml(money(closure.counted_cash))}</td>
           <td>${escapeHtml(money(closure.difference))}</td>
-          <td>${escapeHtml(closure.status || "Cerrada")}</td>
         </tr>
       `).join("")
-    : '<tr><td colspan="6">Todavía no hay cierres registrados.</td></tr>';
+    : '<tr><td colspan="8">Todavía no hay cierres registrados.</td></tr>';
 }
 
 async function refresh() {
