@@ -1,31 +1,162 @@
+<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Reportes · Smok Game</title>
   <link rel="stylesheet" href="assets/css/app.css">
+
   <style>
-    .report-toolbar{display:flex;flex-wrap:wrap;gap:12px;align-items:end;margin-bottom:18px}
-    .report-toolbar label{display:flex;flex-direction:column;gap:6px;font-size:13px}
-    .report-toolbar input{padding:10px;border-radius:9px;border:1px solid var(--border,#333);background:var(--surface,#181818);color:inherit}
-    .report-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:14px;margin-bottom:20px}
-    .report-card{padding:20px;border:1px solid var(--border,#333);border-radius:14px;background:var(--surface,#181818);min-width:0}
-    .report-card span{display:block;font-size:13px;color:var(--muted,#aaa);margin-bottom:9px}
-    .report-card strong{font-size:24px;overflow-wrap:anywhere}
-    .report-panel{min-width:0;margin-bottom:18px}
-    .report-columns{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,390px),1fr));gap:18px}
-    .report-table-wrap{width:100%;overflow-x:auto}
-    .report-table{width:100%;border-collapse:collapse}
-    .report-table th,.report-table td{text-align:left;padding:12px 9px;border-bottom:1px solid var(--border,#333);font-size:13px;white-space:nowrap}
-    .report-table th{color:var(--muted,#aaa);font-weight:500}
-    .report-message{margin:12px 0;color:var(--muted,#aaa);font-size:13px}
-    .report-error{color:#ff7777}
-    .report-actions{display:flex;flex-wrap:wrap;gap:8px}
-    .report-actions button{cursor:pointer}
-    .report-empty{text-align:center;color:var(--muted,#aaa);padding:18px!important}
-    @media(max-width:600px){.report-card{padding:15px}.report-card strong{font-size:21px}}
+    .report-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: end;
+      margin-bottom: 18px;
+    }
+
+    .report-toolbar label {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 13px;
+    }
+
+    .report-toolbar input {
+      padding: 10px;
+      border-radius: 9px;
+      border: 1px solid var(--border, #333);
+      background: var(--surface, #181818);
+      color: inherit;
+    }
+
+    .report-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(175px, 1fr));
+      gap: 14px;
+      margin-bottom: 20px;
+    }
+
+    .report-card {
+      padding: 20px;
+      border: 1px solid var(--border, #333);
+      border-radius: 14px;
+      background: var(--surface, #181818);
+      min-width: 0;
+    }
+
+    .report-card span {
+      display: block;
+      font-size: 13px;
+      color: var(--muted, #aaa);
+      margin-bottom: 9px;
+    }
+
+    .report-card strong {
+      font-size: 24px;
+      overflow-wrap: anywhere;
+    }
+
+    .report-panel {
+      min-width: 0;
+      margin-bottom: 18px;
+    }
+
+    .report-columns {
+      display: grid;
+      grid-template-columns: repeat(
+        auto-fit,
+        minmax(min(100%, 390px), 1fr)
+      );
+      gap: 18px;
+    }
+
+    .report-table-wrap {
+      width: 100%;
+      overflow-x: auto;
+    }
+
+    .report-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .report-table th,
+    .report-table td {
+      text-align: left;
+      padding: 12px 9px;
+      border-bottom: 1px solid var(--border, #333);
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    .report-table th {
+      color: var(--muted, #aaa);
+      font-weight: 500;
+    }
+
+    .report-message {
+      margin: 12px 0;
+      color: var(--muted, #aaa);
+      font-size: 13px;
+    }
+
+    .report-error {
+      color: #ff7777;
+    }
+
+    .report-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .report-actions button {
+      cursor: pointer;
+    }
+
+    .report-empty {
+      text-align: center;
+      color: var(--muted, #aaa);
+      padding: 18px !important;
+    }
+
+    .report-section-heading {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .report-section-heading h3 {
+      margin-bottom: 5px;
+    }
+
+    .report-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 5px 9px;
+      border-radius: 7px;
+      background: var(--surface, #181818);
+      border: 1px solid var(--border, #333);
+      color: var(--muted, #aaa);
+      font-size: 12px;
+    }
+
+    @media (max-width: 600px) {
+      .report-card {
+        padding: 15px;
+      }
+
+      .report-card strong {
+        font-size: 21px;
+      }
+    }
   </style>
 </head>
+
 <body data-page="reports">
   <div class="app-shell">
     <aside class="sidebar">
@@ -33,7 +164,9 @@
         <img src="assets/smok-game-neon.jpg" alt="">
         <span>SMOK GAME</span>
       </a>
+
       <div class="sidebar-label">MENÚ PRINCIPAL</div>
+
       <nav id="main-nav">
         <a href="app.html">▦ <span>Resumen</span></a>
         <a href="sales.html">🛒 <span>Ventas</span></a>
@@ -41,95 +174,259 @@
         <a href="inventory.html">▤ <span>Inventario</span></a>
         <a href="reports.html" class="active">▥ <span>Reportes</span></a>
       </nav>
+
       <div class="sidebar-bottom">
         <a href="app.html#settings">⚙ <span>Configuración</span></a>
-        <button id="logout-btn" class="nav-button">↪ <span>Cerrar sesión</span></button>
+        <button id="logout-btn" class="nav-button">
+          ↪ <span>Cerrar sesión</span>
+        </button>
       </div>
     </aside>
 
     <main class="main-content">
-  <header class="topbar">
-    <div>
-      <p class="eyebrow">SMOK GAME / ANÁLISIS</p>
-      <h1>Reportes</h1>
-    </div>
-    <div class="user-chip">
-      <span class="status-dot"></span>
-      <span id="current-user">Cargando…</span>
-    </div>
-  </header>
-
-  <section class="content-section">
-    <div class="welcome">
-      <div>
-        <p class="eyebrow">INFORMACIÓN DEL NEGOCIO</p>
-        <h2>Reportes y estadísticas</h2>
-        <p class="muted">Ventas, inventario y cierres de caja.</p>
-      </div>
-      <span class="badge">Datos de Supabase</span>
-    </div>
-
-    <article class="panel">
-      <div class="report-toolbar">
-        <label>Desde<input id="date-from" type="date"></label>
-        <label>Hasta<input id="date-to" type="date"></label>
-        <div class="report-actions">
-          <button id="apply-filter" class="primary-btn compact">Consultar</button>
-          <button id="export-sales" class="secondary-btn">Exportar ventas CSV</button>
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">SMOK GAME / ANÁLISIS</p>
+          <h1>Reportes</h1>
         </div>
-      </div>
-      <p id="report-message" class="report-message" role="status">Cargando reportes…</p>
-    </article>
 
-    <div class="report-grid">
-      <article class="report-card"><span>Ventas del período</span><strong id="total-sales">—</strong></article>
-      <article class="report-card"><span>Operaciones registradas</span><strong id="sales-count">—</strong></article>
-      <article class="report-card"><span>Ventas en efectivo</span><strong id="cash-sales">—</strong></article>
-      <article class="report-card"><span>Ventas por QR</span><strong id="qr-sales">—</strong></article>
-      <article class="report-card"><span>Productos activos</span><strong id="product-count">—</strong></article>
-      <article class="report-card"><span>Productos con stock bajo</span><strong id="low-stock-count">—</strong></article>
-    </div>
+        <div class="user-chip">
+          <span class="status-dot"></span>
+          <span id="current-user">Cargando…</span>
+        </div>
+      </header>
 
-    <div class="report-columns">
-      <article class="panel report-panel">
-        <div class="panel-heading">
-          <div><h3>Productos más vendidos</h3><p class="muted">Según las ventas del período</p></div>
-        </div>
-        <div class="report-table-wrap">
-          <table class="report-table">
-            <thead><tr><th>Producto</th><th>Unidades</th><th>Total vendido</th></tr></thead>
-            <tbody id="top-products"><tr><td colspan="3">Cargando…</td></tr></tbody>
-          </table>
-        </div>
-      </article>
+      <section class="content-section">
+        <div class="welcome">
+          <div>
+            <p class="eyebrow">INFORMACIÓN DEL NEGOCIO</p>
+            <h2>Reportes y estadísticas</h2>
+            <p class="muted">
+              Ventas, inventario, movimientos y cierres de caja.
+            </p>
+          </div>
 
-      <article class="panel report-panel">
-        <div class="panel-heading">
-          <div><h3>Stock bajo</h3><p class="muted">Productos en su mínimo o por debajo</p></div>
+          <span class="badge">Datos de Supabase</span>
         </div>
-        <div class="report-table-wrap">
-          <table class="report-table">
-            <thead><tr><th>Producto</th><th>Stock</th><th>Mínimo</th></tr></thead>
-            <tbody id="low-stock"><tr><td colspan="3">Cargando…</td></tr></tbody>
-          </table>
-        </div>
-      </article>
-    </div>
 
-    <article class="panel report-panel">
-      <div class="panel-heading">
-        <div><h3>Historial de cierres de caja</h3><p class="muted">Cierres del período seleccionado</p></div>
-      </div>
-      <div class="report-table-wrap">
-        <table class="report-table">
-          <thead><tr><th>Apertura</th><th>Cierre</th><th>Esperado</th><th>Contado</th><th>Diferencia</th></tr></thead>
-          <tbody id="cash-closures"><tr><td colspan="5">Cargando…</td></tr></tbody>
-        </table>
-      </div>
-    </article>
-  </section>
-</main>
+        <article class="panel">
+          <div class="report-toolbar">
+            <label>
+              Desde
+              <input id="date-from" type="date">
+            </label>
+
+            <label>
+              Hasta
+              <input id="date-to" type="date">
+            </label>
+
+            <div class="report-actions">
+              <button id="apply-filter" class="primary-btn compact">
+                Consultar
+              </button>
+
+              <button id="export-sales" class="secondary-btn">
+                Exportar ventas CSV
+              </button>
+            </div>
+          </div>
+
+          <p id="report-message" class="report-message" role="status">
+            Cargando reportes…
+          </p>
+        </article>
+
+        <div class="report-grid">
+          <article class="report-card">
+            <span>Ventas del período</span>
+            <strong id="total-sales">—</strong>
+          </article>
+
+          <article class="report-card">
+            <span>Operaciones registradas</span>
+            <strong id="sales-count">—</strong>
+          </article>
+
+          <article class="report-card">
+            <span>Ventas en efectivo</span>
+            <strong id="cash-sales">—</strong>
+          </article>
+
+          <article class="report-card">
+            <span>Ventas por QR</span>
+            <strong id="qr-sales">—</strong>
+          </article>
+
+          <article class="report-card">
+            <span>Productos activos</span>
+            <strong id="product-count">—</strong>
+          </article>
+
+          <article class="report-card">
+            <span>Productos con stock bajo</span>
+            <strong id="low-stock-count">—</strong>
+          </article>
+        </div>
+
+        <div class="report-columns">
+          <article class="panel report-panel">
+            <div class="panel-heading">
+              <div>
+                <h3>Productos más vendidos</h3>
+                <p class="muted">Según las ventas del período</p>
+              </div>
+            </div>
+
+            <div class="report-table-wrap">
+              <table class="report-table">
+                <thead>
+                  <tr>
+                    <th>Producto</th>
+                    <th>Unidades</th>
+                    <th>Total vendido</th>
+                  </tr>
+                </thead>
+
+                <tbody id="top-products">
+                  <tr><td colspan="3">Cargando…</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
+
+          <article class="panel report-panel">
+            <div class="panel-heading">
+              <div>
+                <h3>Stock bajo</h3>
+                <p class="muted">
+                  Productos en su mínimo o por debajo
+                </p>
+              </div>
+            </div>
+
+            <div class="report-table-wrap">
+              <table class="report-table">
+                <thead>
+                  <tr>
+                    <th>Producto</th>
+                    <th>Stock</th>
+                    <th>Mínimo</th>
+                  </tr>
+                </thead>
+
+                <tbody id="low-stock">
+                  <tr><td colspan="3">Cargando…</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
+        </div>
+
+        <!-- PRODUCTOS REGISTRADOS -->
+        <article class="panel report-panel">
+          <div class="report-section-heading">
+            <div>
+              <h3>Productos registrados</h3>
+              <p class="muted">
+                Altas de productos durante el período seleccionado
+              </p>
+            </div>
+
+            <button id="export-products" class="secondary-btn">
+              Exportar productos CSV
+            </button>
+          </div>
+
+          <div class="report-table-wrap">
+            <table class="report-table">
+              <thead>
+                <tr>
+                  <th>Fecha de registro</th>
+                  <th>Producto</th>
+                  <th>Categoría</th>
+                  <th>Stock actual</th>
+                  <th>Responsable</th>
+                </tr>
+              </thead>
+
+              <tbody id="registered-products">
+                <tr><td colspan="5">Cargando…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </article>
+
+        <!-- MOVIMIENTOS DE INVENTARIO -->
+        <article class="panel report-panel">
+          <div class="report-section-heading">
+            <div>
+              <h3>Movimientos de inventario</h3>
+              <p class="muted">
+                Entradas, salidas, ventas y otros cambios de stock
+              </p>
+            </div>
+
+            <button id="export-movements" class="secondary-btn">
+              Exportar movimientos CSV
+            </button>
+          </div>
+
+          <div class="report-table-wrap">
+            <table class="report-table">
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Producto</th>
+                  <th>Movimiento</th>
+                  <th>Cantidad</th>
+                  <th>Stock anterior</th>
+                  <th>Stock posterior</th>
+                  <th>Responsable</th>
+                  <th>Observación</th>
+                </tr>
+              </thead>
+
+              <tbody id="inventory-movements">
+                <tr><td colspan="8">Cargando…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </article>
+
+        <!-- CIERRES DE CAJA -->
+        <article class="panel report-panel">
+          <div class="panel-heading">
+            <div>
+              <h3>Historial de cierres de caja</h3>
+              <p class="muted">
+                Cierres del período seleccionado
+              </p>
+            </div>
+          </div>
+
+          <div class="report-table-wrap">
+            <table class="report-table">
+              <thead>
+                <tr>
+                  <th>Apertura</th>
+                  <th>Cierre</th>
+                  <th>Esperado</th>
+                  <th>Contado</th>
+                  <th>Diferencia</th>
+                </tr>
+              </thead>
+
+              <tbody id="cash-closures">
+                <tr><td colspan="5">Cargando…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </article>
+      </section>
+    </main>
   </div>
+
   <script type="module" src="assets/js/reports.js"></script>
 </body>
 </html>
