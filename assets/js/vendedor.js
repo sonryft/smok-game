@@ -110,6 +110,16 @@ async function loadCashStatus() {
   .limit(1)
   .maybeSingle();
 
+if (shiftError) {
+  throw new Error(`Error buscando la caja abierta: ${shiftError.message}`);
+}
+
+if (!shift) {
+  throw new Error(
+    "No se encontró una caja abierta. Comprueba los permisos de acceso en Supabase."
+  );
+}
+
   if (error) {
     console.error("Error consultando caja:", error);
 
