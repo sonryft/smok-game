@@ -1,4 +1,3 @@
-<!doctype html>
 <html lang="es">
 <head>
   <meta charset="utf-8">
@@ -6,103 +5,332 @@
   <title>Caja y arqueo · Smok Game</title>
   <link rel="stylesheet" href="assets/css/app.css">
   <style>
-    .cash-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:18px;margin-bottom:22px}
-    .cash-card{padding:22px;border:1px solid var(--border-color,#333);border-radius:16px;background:var(--panel-bg,#171717)}
-    .cash-card h3{margin:0 0 10px}
-    .cash-card strong{font-size:1.5rem;display:block;margin:8px 0}
-    .cash-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px}
-    .cash-form label{display:flex;flex-direction:column;gap:7px}
-    .cash-form input,.cash-form select,.cash-form textarea{width:100%;padding:11px;border-radius:9px;border:1px solid var(--border-color,#444);background:var(--input-bg,#111);color:inherit}
-    .cash-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
-    .cash-table{width:100%;border-collapse:collapse}
-    .cash-table th,.cash-table td{text-align:left;padding:12px;border-bottom:1px solid var(--border-color,#333)}
-    .cash-message{margin-top:12px}
-    .cash-positive{color:#48d597}.cash-negative{color:#ff8585}
-    .cash-muted{opacity:.75}
+    .cash-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+      gap: 18px;
+      margin-bottom: 22px;
+    }
+
+    .cash-card {
+      padding: 22px;
+      border: 1px solid var(--border-color, #333);
+      border-radius: 16px;
+      background: var(--panel-bg, #171717);
+    }
+
+    .cash-card h3 { margin: 0 0 10px; }
+    .cash-card strong { font-size: 1.5rem; display: block; margin: 8px 0; }
+
+    .cash-form {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 14px;
+    }
+
+    .cash-form label {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+
+    .cash-form input,
+    .cash-form select,
+    .cash-form textarea {
+      width: 100%;
+      padding: 11px;
+      border-radius: 9px;
+      border: 1px solid var(--border-color, #444);
+      background: var(--input-bg, #111);
+      color: inherit;
+    }
+
+    .cash-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 16px;
+    }
+
+    .cash-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .cash-table th,
+    .cash-table td {
+      text-align: left;
+      padding: 12px;
+      border-bottom: 1px solid var(--border-color, #333);
+      white-space: nowrap;
+    }
+
+    .cash-table th {
+      font-size: 0.85rem;
+      color: var(--text-muted, #aaa);
+    }
+
+    .cash-message { margin-top: 12px; }
+    .cash-positive { color: #48d597; }
+    .cash-negative { color: #ff8585; }
+    .cash-muted { opacity: 0.75; }
+
+    .cash-table-wrap {
+      width: 100%;
+      overflow-x: auto;
+    }
+
+    @media (max-width: 600px) {
+      .cash-card { padding: 16px; }
+      .cash-card strong { font-size: 1.3rem; }
+      .cash-table th,
+      .cash-table td { padding: 10px; }
+    }
   </style>
 </head>
 <body>
   <div class="app-shell">
     <aside class="sidebar">
-      <a class="brand" href="app.html"><img src="assets/smok-game-neon.jpg" alt=""><span>SMOK GAME</span></a>
-      <div class="sidebar-label">MENÚ PRINCIPAL</div>
-      <nav id="cash-nav">
-        <a href="app.html">▦ <span>Resumen</span></a>
-        <a href="sales.html">🛒 <span>Ventas</span></a>
-        <a href="cash.html" class="active">▣ <span>Caja y arqueo</span></a>
-        <a href="inventory.html">▤ <span>Inventario</span></a>
-      </nav>
-      <div class="sidebar-bottom">
-        <button id="cash-logout" class="nav-button">↪ <span>Cerrar sesión</span></button>
+      <a class="brand" href="app.html">
+        <img src="assets/smok-game-neon.jpg" alt="">
+        <span>SMOK GAME</span>
+      </a>
+  <div class="sidebar-label">MENÚ PRINCIPAL</div>
+
+  <nav id="cash-nav">
+    <a href="app.html">▦ <span>Resumen</span></a>
+    <a href="sales.html">🛒 <span>Ventas</span></a>
+    <a href="cash.html" class="active">▣ <span>Caja y arqueo</span></a>
+    <a href="inventory.html">▤ <span>Inventario</span></a>
+  </nav>
+
+  <div class="sidebar-bottom">
+    <button id="cash-logout" class="nav-button" type="button">
+      ↪ <span>Cerrar sesión</span>
+    </button>
+  </div>
+</aside>
+
+<main class="main-content">
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">SMOK GAME / OPERACIONES</p>
+      <h1>Caja y arqueo</h1>
+    </div>
+
+    <div class="user-chip">
+      <span class="status-dot"></span>
+      <span id="cash-user">Cargando…</span>
+    </div>
+  </header>
+
+  <section class="content-section">
+    <div class="welcome">
+      <div>
+        <p class="eyebrow">CONTROL DE EFECTIVO</p>
+        <h2 id="cash-status-title">Consultando caja…</h2>
+        <p class="muted">Apertura, ingresos, retiros y cierre de jornada.</p>
       </div>
-    </aside>
+    </div>
 
-    <main class="main-content">
-      <header class="topbar">
-        <div><p class="eyebrow">SMOK GAME / OPERACIONES</p><h1>Caja y arqueo</h1></div>
-        <div class="user-chip"><span class="status-dot"></span><span id="cash-user">Cargando…</span></div>
-      </header>
+    <!-- Resumen de caja -->
+    <div class="cash-grid">
+      <article class="cash-card">
+        <span class="cash-muted">Fondo inicial</span>
+        <strong id="cash-opening">Bs 0,00</strong>
+      </article>
 
-      <section class="content-section">
-        <div class="welcome">
-          <div><p class="eyebrow">CONTROL DE EFECTIVO</p><h2 id="cash-status-title">Consultando caja…</h2><p class="muted">Apertura, ingresos, retiros y cierre de jornada.</p></div>
+      <article class="cash-card">
+        <span class="cash-muted">Efectivo esperado</span>
+        <strong id="cash-expected">Bs 0,00</strong>
+      </article>
+
+      <article class="cash-card">
+        <span class="cash-muted">Ventas en efectivo</span>
+        <strong id="cash-sales">Bs 0,00</strong>
+      </article>
+
+      <article class="cash-card">
+        <span class="cash-muted">Ventas por QR</span>
+        <strong id="cash-qr">Bs 0,00</strong>
+      </article>
+    </div>
+
+    <!-- Apertura -->
+    <article class="panel">
+      <div class="panel-heading">
+        <div>
+          <h3>Apertura de caja</h3>
+          <p class="muted">Ingresa el dinero disponible al comenzar.</p>
+        </div>
+      </div>
+
+      <form id="cash-open-form">
+        <div class="cash-form">
+          <label>
+            Fondo inicial (Bs)
+            <input id="opening-amount" type="number" min="0" step="0.01" value="0" required>
+          </label>
+
+          <label>
+            Nota (opcional)
+            <input id="opening-note" maxlength="250" placeholder="Observaciones de apertura">
+          </label>
         </div>
 
-        <div class="cash-grid">
-          <article class="cash-card"><span class="cash-muted">Fondo inicial</span><strong id="cash-opening">Bs 0,00</strong></article>
-          <article class="cash-card"><span class="cash-muted">Efectivo esperado</span><strong id="cash-expected">Bs 0,00</strong></article>
-          <article class="cash-card"><span class="cash-muted">Ventas en efectivo</span><strong id="cash-sales">Bs 0,00</strong></article>
-          <article class="cash-card"><span class="cash-muted">Ventas por QR</span><strong id="cash-qr">Bs 0,00</strong></article>
+        <div class="cash-actions">
+          <button class="primary-btn" type="submit" id="cash-open-btn">Abrir caja</button>
+        </div>
+      </form>
+    </article>
+
+    <!-- Movimientos de caja -->
+    <article class="panel">
+      <div class="panel-heading">
+        <div>
+          <h3>Movimiento de caja</h3>
+          <p class="muted">Registra ingresos o retiros que no provienen de una venta.</p>
+        </div>
+      </div>
+
+      <form id="cash-movement-form">
+        <div class="cash-form">
+          <label>
+            Tipo
+            <select id="movement-type">
+              <option value="income">Ingreso</option>
+              <option value="withdrawal">Retiro</option>
+            </select>
+          </label>
+
+          <label>
+            Monto (Bs)
+            <input id="movement-amount" type="number" min="0.01" step="0.01" required>
+          </label>
+
+          <label>
+            Método
+            <select id="movement-method">
+              <option value="efectivo">Efectivo</option>
+              <option value="qr">QR</option>
+            </select>
+          </label>
+
+          <label>
+            Nota
+            <input id="movement-note" maxlength="250" placeholder="Motivo del movimiento" required>
+          </label>
         </div>
 
-        <article class="panel">
-          <div class="panel-heading"><div><h3>Apertura de caja</h3><p class="muted">Ingresa el dinero disponible al comenzar.</p></div></div>
-          <form id="cash-open-form">
-            <div class="cash-form">
-              <label>Fondo inicial (Bs)<input id="opening-amount" type="number" min="0" step="0.01" value="0" required></label>
-              <label>Nota (opcional)<input id="opening-note" maxlength="250" placeholder="Observaciones de apertura"></label>
-            </div>
-            <div class="cash-actions"><button class="primary-btn" type="submit" id="cash-open-btn">Abrir caja</button></div>
-          </form>
-        </article>
+        <div class="cash-actions">
+          <button class="primary-btn" type="submit" id="cash-movement-btn">
+            Registrar movimiento
+          </button>
+        </div>
+      </form>
 
-        <article class="panel">
-          <div class="panel-heading"><div><h3>Movimiento de caja</h3><p class="muted">Registra ingresos o retiros que no provienen de una venta.</p></div></div>
-          <form id="cash-movement-form">
-            <div class="cash-form">
-              <label>Tipo<select id="movement-type"><option value="income">Ingreso</option><option value="withdrawal">Retiro</option></select></label>
-              <label>Monto (Bs)<input id="movement-amount" type="number" min="0.01" step="0.01" required></label>
-              <label>Método<select id="movement-method"><option value="efectivo">Efectivo</option><option value="qr">QR</option></select></label>
-              <label>Nota<input id="movement-note" maxlength="250" placeholder="Motivo del movimiento" required></label>
-            </div>
-            <div class="cash-actions"><button class="primary-btn" type="submit" id="cash-movement-btn">Registrar movimiento</button></div>
-          </form>
-          <p id="cash-movement-message" class="cash-message"></p>
-        </article>
+      <p id="cash-movement-message" class="cash-message" aria-live="polite"></p>
+    </article>
 
-        <article class="panel">
-          <div class="panel-heading"><div><h3>Arqueo y cierre</h3><p class="muted">Cuenta el efectivo físico antes de cerrar.</p></div></div>
-          <form id="cash-close-form">
-            <div class="cash-form">
-              <label>Efectivo contado (Bs)<input id="counted-cash" type="number" min="0" step="0.01" required></label>
-              <label>Observaciones<textarea id="close-note" rows="2" maxlength="500" placeholder="Explica cualquier diferencia, si corresponde"></textarea></label>
-            </div>
-            <div class="cash-actions"><button class="primary-btn" type="submit" id="cash-close-btn">Realizar arqueo y cerrar</button></div>
-          </form>
-          <p id="cash-close-message" class="cash-message"></p>
-        </article>
+    <!-- Arqueo y cierre -->
+    <article class="panel">
+      <div class="panel-heading">
+        <div>
+          <h3>Arqueo y cierre</h3>
+          <p class="muted">Cuenta el efectivo físico antes de cerrar.</p>
+        </div>
+      </div>
 
-        <article class="panel">
-          <div class="panel-heading"><div><h3>Movimientos recientes</h3><p class="muted">Operaciones de la caja actual.</p></div><button id="cash-refresh" class="secondary-btn compact" type="button">Actualizar</button></div>
-          <div class="table-wrap"><table class="cash-table"><thead><tr><th>Fecha</th><th>Tipo</th><th>Método</th><th>Monto</th><th>Nota</th></tr></thead><tbody id="cash-movements"><tr><td colspan="5">Cargando…</td></tr></tbody></table></div>
-        </article>
+      <form id="cash-close-form">
+        <div class="cash-form">
+          <label>
+            Efectivo contado (Bs)
+            <input id="counted-cash" type="number" min="0" step="0.01" required>
+          </label>
 
-        <article class="panel">
-          <div class="panel-heading"><div><h3>Cierres anteriores</h3><p class="muted">Historial de arqueos registrados.</p></div></div>
-          <div class="table-wrap"><table class="cash-table"><thead><tr><th>Apertura</th><th>Cierre</th><th>Esperado</th><th>Contado</th><th>Diferencia</th><th>Estado</th></tr></thead><tbody id="cash-closures"><tr><td colspan="6">Cargando…</td></tr></tbody></table></div>
-        </article>
-      </section>
-    </main>
+          <label>
+            Observaciones
+            <textarea id="close-note" rows="2" maxlength="500"
+              placeholder="Explica cualquier diferencia, si corresponde"></textarea>
+          </label>
+        </div>
+
+        <div class="cash-actions">
+          <button class="primary-btn" type="submit" id="cash-close-btn">
+            Realizar arqueo y cerrar
+          </button>
+        </div>
+      </form>
+
+      <p id="cash-close-message" class="cash-message" aria-live="polite"></p>
+    </article>
+
+    <!-- Movimientos recientes -->
+    <article class="panel">
+      <div class="panel-heading">
+        <div>
+          <h3>Movimientos recientes</h3>
+          <p class="muted">Operaciones de la caja actual.</p>
+        </div>
+
+        <button id="cash-refresh" class="secondary-btn compact" type="button">
+          Actualizar
+        </button>
+      </div>
+
+      <div class="cash-table-wrap">
+        <table class="cash-table">
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Tipo</th>
+              <th>Método</th>
+              <th>Monto</th>
+              <th>Nota</th>
+            </tr>
+          </thead>
+
+          <tbody id="cash-movements">
+            <tr><td colspan="5">Cargando movimientos...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </article>
+
+    <!-- Historial de cierres -->
+    <article class="panel">
+      <div class="panel-heading">
+        <div>
+          <h3>Cierres anteriores</h3>
+          <p class="muted">
+            Historial de arqueos registrados, con responsables de apertura y cierre.
+          </p>
+        </div>
+      </div>
+
+      <div class="cash-table-wrap">
+        <table class="cash-table">
+          <thead>
+            <tr>
+              <th>Fecha de apertura</th>
+              <th>Abierta por</th>
+              <th>Fondo inicial</th>
+              <th>Fecha de cierre</th>
+              <th>Cerrada por</th>
+              <th>Efectivo esperado</th>
+              <th>Efectivo contado</th>
+              <th>Diferencia</th>
+            </tr>
+          </thead>
+
+          <tbody id="cash-closures">
+            <tr><td colspan="8">Cargando cierres...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </article>
+  </section>
+</main>
   </div>
   <script type="module" src="assets/js/cash.js"></script>
 </body>
