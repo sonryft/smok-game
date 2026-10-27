@@ -536,11 +536,41 @@ $("#cash-close-form").addEventListener("submit", async event => {
   if (button) button.disabled = true;
 
   try {
-    const { error } = await supabase.rpc("close_cash_shift", {
-      p_shift_id: shift.id,
-      p_counted_cash: counted,
-      p_note: note || null
-    });
+    const qrInput = document.querySelector("#counted-qr");
+
+const qrDeclared = Number(qrInput?.value || 0);
+
+if (
+
+  !Number.isFinite(qrDeclared) ||
+
+  qrDeclared < 0 ||
+
+  Math.round(qrDeclared * 100) !== qrDeclared * 100
+
+) {
+
+  return message(
+
+    "#cash-close-message",
+
+    "Introduce un importe QR válido."
+
+  );
+
+}
+
+const { error } = await supabase.rpc("close_cash_shift", {
+
+  p_shift_id: shift.id,
+
+  p_counted_cash: counted,
+
+  p_note: note || null,
+
+  p_qr_declared: qrDeclared
+
+});
 
     if (error) throw error;
 
