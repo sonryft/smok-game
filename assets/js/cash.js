@@ -127,9 +127,6 @@ async function loadShift() {
     .order("opened_at", { ascending: false })
     .limit(1);
 
-  if (!isAdmin) {
-    query = query.eq("opened_by", profile.id);
-  }
 
   const { data, error } = await query.maybeSingle();
 
