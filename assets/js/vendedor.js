@@ -61,11 +61,13 @@ document.querySelectorAll("[data-section]").forEach(button => {
 
 const sellerUser = $("#seller-name").closest(".seller-user");
 
-sellerUser.style.cursor = "pointer";
+if (sellerUser) {
+  sellerUser.style.cursor = "pointer";
 
-sellerUser.addEventListener("click", () => {
-  showSection("cuenta");
-});
+  sellerUser.addEventListener("click", () => {
+    showSection("cuenta");
+  });
+}
 
 $("#seller-logout").addEventListener("click", async () => {
   await supabase.auth.signOut();
@@ -102,53 +104,59 @@ async function loadCashStatus() {
   const amountInput = $("#seller-opening-amount");
   const openButton = $("#seller-open-btn");
 
-  const { data: shift, error: shiftError } = await supabase
-  .from("cash_shifts")
-  .select("id, opened_by, status")
-  .eq("status", "open")
-  .order("opened_at", { ascending: false })
-  .limit(1)
-  .maybeSingle();
+  try {
+    const { data: shift, error } = await supabase
+      .from("cash_shifts")
+      .select("id, opened_by, status")
+      .eq("status", "open")
+      .order("opened_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-if (shiftError) {
-  throw new Error(`Error buscando la caja abierta: ${shiftError.message}`);
-}
+    if (error) throw error;
 
-if (!shift) {
-  throw new Error(
-    "No se encontró una caja abierta. Comprueba los permisos de acceso en Supabase."
-  );
-}
+    const isOpen = Boolean(shift);
 
-  if (error) {
+    if (status) {
+      status.textContent = isOpen ? "Caja abierta" : "Caja cerrada";
+    }
+
+    if (stat) {
+      stat.textContent = isOpen ? "Abierta" : "Cerrada";
+    }
+
+    if (amountInput) amountInput.disabled = isOpen;
+    if (openButton) {
+      openButton.disabled = isOpen;
+      openButton.textContent = isOpen
+        ? "Ya existe una caja abierta"
+        : "Abrir caja";
+    }
+
+    if (!isOpen) {
+      showCashMessage("No hay ninguna caja abierta.");
+    } else if (shift.opened_by !== profile.id) {
+      showCashMessage(
+        "La caja está abierta por otro usuario. Se utilizará la caja compartida.",
+        true
+      );
+    } else {
+      showCashMessage("La caja está abierta.", true);
+    }
+
+    return shift;
+  } catch (error) {
     console.error("Error consultando caja:", error);
 
-    status.textContent = "Estado no disponible";
-    stat.textContent = "No disponible";
-    amountInput.disabled = true;
-    openButton.disabled = true;
+    if (status) status.textContent = "Estado no disponible";
+    if (stat) stat.textContent = "No disponible";
 
-    return;
-  }
+    if (amountInput) amountInput.disabled = true;
+    if (openButton) openButton.disabled = true;
 
-  const isOpen = Boolean(data);
+    showCashMessage(`No se pudo consultar la caja: ${error.message}`);
 
-  status.textContent = isOpen ? "Caja abierta" : "Caja cerrada";
-  stat.textContent = isOpen ? "Abierta" : "Cerrada";
-
-  amountInput.disabled = isOpen;
-  openButton.disabled = isOpen;
-
-  openButton.textContent = isOpen
-    ? "Ya existe una caja abierta"
-    : "Abrir caja";
-
-  if (isOpen && data.opened_by !== profile.id) {
-    showCashMessage(
-      "Ya existe una caja abierta por otro usuario. No puedes abrir otra."
-    );
-  } else if (isOpen) {
-    showCashMessage("Tu caja está abierta.", true);
+    return null;
   }
 }
 
@@ -254,7 +262,6 @@ if (closeForm) {
         .from("cash_shifts")
         .select("id, opened_by, status")
         .eq("status", "open")
-        .eq("opened_by", profile.id)
         .order("opened_at", { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -262,7 +269,9 @@ if (closeForm) {
       if (shiftError) throw shiftError;
 
       if (!shift) {
-        throw new Error("No tienes una caja abierta para cerrar.");
+        throw new Error(
+          "No se encontró una caja abierta. Comprueba los permisos de lectura en Supabase."
+        );
       }
 
       const { error: closeError } = await supabase.rpc(
@@ -287,9 +296,7 @@ if (closeForm) {
     } catch (error) {
       console.error("Error cerrando caja:", error);
 
-      showCashMessage(
-        `No se pudo cerrar la caja: ${error.message}`
-      );
+      showCashMessage(`No se pudo cerrar la caja: ${error.message}`);
     } finally {
       button.disabled = false;
       button.textContent = "Confirmar arqueo y cerrar caja";
