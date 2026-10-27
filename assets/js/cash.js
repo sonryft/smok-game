@@ -126,14 +126,7 @@ async function loadShift() {
     : "Caja cerrada";
 
   $("#cash-opening").textContent =
-    money(shift?.opening_amount || 0);
-
-  const expectedElement = $("#cash-expected");
-
-  if (expectedElement && isAdmin) {
-    expectedElement.textContent =
-      "El efectivo esperado se calcula al cerrar.";
-  }
+    money(Number(shift?.opening_amount ?? 0));
 
   setFormPermissions();
 }
@@ -150,25 +143,41 @@ async function loadSalesTotals() {
     return;
   }
 
-  const { data, error } = await supabase
-    .from("sales")
-    .select("total,payment_method,status")
-    .eq("shift_id", shift.id)
-    .eq("status", "completed");
+  const [
+    { data: sales, error: salesError },
+    { data: movements, error: movementsError }
+  ] = await Promise.all([
+    supabase
+      .from("sales")
+      .select("total,payment_method,status")
+      .eq("shift_id", shift.id)
+      .eq("status", "completed"),
 
-  if (error) throw error;
+    supabase
+      .from("cash_movements")
+      .select("movement_type,payment_method,amount")
+      .eq("shift_id", shift.id)
+  ]);
 
-  const sales = data || [];
+  if (salesError) throw salesError;
+  if (movementsError) throw movementsError;
 
-  const cashSales = sales
-    .filter(sale => sale.payment_method === "efectivo")
+  const completedSales = sales || [];
+  const cashMovements = movements || [];
+
+  const cashSales = completedSales
+    .filter(sale =>
+      String(sale.payment_method || "").toLowerCase() === "efectivo"
+    )
     .reduce(
       (total, sale) => total + Number(sale.total || 0),
       0
     );
 
-  const qrSales = sales
-    .filter(sale => sale.payment_method === "qr")
+  const qrSales = completedSales
+    .filter(sale =>
+      String(sale.payment_method || "").toLowerCase() === "qr"
+    )
     .reduce(
       (total, sale) => total + Number(sale.total || 0),
       0
@@ -177,10 +186,34 @@ async function loadSalesTotals() {
   $("#cash-sales").textContent = money(cashSales);
   $("#cash-qr").textContent = money(qrSales);
 
-  // No calculamos ni mostramos la diferencia en el navegador.
   if (isAdmin) {
-    $("#cash-expected").textContent =
-      "Se calcula al cerrar el turno.";
+    const cashIncome = cashMovements
+      .filter(movement =>
+        movement.payment_method === "efectivo" &&
+        movement.movement_type === "income"
+      )
+      .reduce(
+        (total, movement) => total + Number(movement.amount || 0),
+        0
+      );
+
+    const cashWithdrawals = cashMovements
+      .filter(movement =>
+        movement.payment_method === "efectivo" &&
+        movement.movement_type === "withdrawal"
+      )
+      .reduce(
+        (total, movement) => total + Number(movement.amount || 0),
+        0
+      );
+
+    const expectedCash =
+      Number(shift.opening_amount || 0) +
+      cashSales +
+      cashIncome -
+      cashWithdrawals;
+
+    $("#cash-expected").textContent = money(expectedCash);
   }
 }
 
@@ -231,7 +264,6 @@ async function loadClosures() {
     return;
   }
 
-  // El historial administrativo utiliza la vista específica.
   const { data, error } = await supabase
     .from("admin_cash_closures")
     .select(
@@ -263,9 +295,9 @@ async function loadClosures() {
 async function refresh() {
   try {
     await loadShift();
-    await loadSalesTotals();
 
     await Promise.all([
+      loadSalesTotals(),
       loadMovements(),
       loadClosures()
     ]);
@@ -279,7 +311,7 @@ async function refresh() {
   }
 }
 
-// APERTURA SEGURA
+// APERTURA DE CAJA
 $("#cash-open-form").addEventListener("submit", async event => {
   event.preventDefault();
 
@@ -303,7 +335,7 @@ $("#cash-open-form").addEventListener("submit", async event => {
   if (
     !Number.isFinite(amount) ||
     amount < 0 ||
-    !Number.isInteger(amount * 100)
+    Math.round(amount * 100) !== amount * 100
   ) {
     return message(
       "#cash-movement-message",
@@ -344,7 +376,7 @@ $("#cash-open-form").addEventListener("submit", async event => {
   }
 });
 
-// MOVIMIENTOS
+// MOVIMIENTOS DE CAJA
 $("#cash-movement-form").addEventListener("submit", async event => {
   event.preventDefault();
 
@@ -370,7 +402,7 @@ $("#cash-movement-form").addEventListener("submit", async event => {
   if (
     !Number.isFinite(amount) ||
     amount <= 0 ||
-    !Number.isInteger(amount * 100)
+    Math.round(amount * 100) !== amount * 100
   ) {
     return message(
       "#cash-movement-message",
@@ -437,7 +469,7 @@ $("#cash-movement-form").addEventListener("submit", async event => {
   await refresh();
 });
 
-// CIERRE SEGURO
+// CIERRE Y ARQUEO
 $("#cash-close-form").addEventListener("submit", async event => {
   event.preventDefault();
 
@@ -461,7 +493,7 @@ $("#cash-close-form").addEventListener("submit", async event => {
   if (
     !Number.isFinite(counted) ||
     counted < 0 ||
-    !Number.isInteger(counted * 100)
+    Math.round(counted * 100) !== counted * 100
   ) {
     return message(
       "#cash-close-message",
@@ -471,8 +503,7 @@ $("#cash-close-form").addEventListener("submit", async event => {
 
   if (!confirm(
     `Vas a declarar ${money(counted)} como efectivo contado.\n\n` +
-    "Supabase registrará el arqueo y cerrará el turno.\n" +
-    "La diferencia no se mostrará en esta pantalla.\n\n" +
+    "Supabase registrará el arqueo y cerrará el turno.\n\n" +
     "¿Deseas continuar?"
   )) return;
 
