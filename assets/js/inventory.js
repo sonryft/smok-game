@@ -2,197 +2,514 @@ import { supabase, requireSession, money } from "./supabase.js";
 
 const auth = await requireSession();
 if (!auth) throw new Error("Sesión requerida");
+
 const { profile } = auth;
-const $ = (s) => document.querySelector(s);
+const $ = (selector) => document.querySelector(selector);
 const form = $("#product-form");
 const rowsEl = $("#inventory-rows");
-let products = [];
-let canManage = profile.role === "admin";
 
-document.documentElement.dataset.theme = localStorage.getItem("smok-theme") || "carbon";
-$("#inventory-user").textContent = profile.full_name || profile.username || "Usuario";
+let products = [];
+const isAdmin = profile.role === "admin";
+
+// Comprobar permisos reales del usuario en Supabase.
+let canCreate = isAdmin;
+let canEdit = isAdmin;
+
+if (!isAdmin) {
+  const [createResult, editResult] = await Promise.all([
+    supabase.rpc("has_permission", {
+      permission_key: "inventory.create_product"
+    }),
+    supabase.rpc("has_permission", {
+      permission_key: "inventory.edit_product"
+    })
+  ]);
+
+  canCreate = !createResult.error && createResult.data === true;
+  canEdit = !editResult.error && editResult.data === true;
+}
+
+const canManage = canCreate || canEdit;
+
+document.documentElement.dataset.theme =
+  localStorage.getItem("smok-theme") || "carbon";
+
+$("#inventory-user").textContent =
+  profile.full_name || profile.username || "Usuario";
+
 $("#inventory-logout").addEventListener("click", async () => {
   await supabase.auth.signOut();
   location.replace("login.html");
 });
 
-function esc(v) {
-  return String(v ?? "").replace(/[&<>"']/g, c => ({
-    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
-  }[c]));
+function esc(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;"
+  })[character]);
 }
-function say(el, message, ok = false) {
-  el.textContent = message;
-  el.className = `message ${ok ? "ok" : "error"}`;
-}
-function numeric(v) { const n = Number(v); return Number.isFinite(n) ? n : 0; }
 
+function say(element, message, success = false) {
+  if (!element) return;
+
+  element.textContent = message;
+  element.className = `message ${success ? "ok" : "error"}`;
+}
+
+function numeric(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : 0;
+}
+
+// Cargar productos desde Supabase.
 async function loadProducts() {
-  rowsEl.innerHTML = '<tr><td colspan="8" class="empty">Cargando inventario…</td></tr>';
+  rowsEl.innerHTML =
+    '<tr><td colspan="8" class="empty">Cargando inventario…</td></tr>';
+
   const { data, error } = await supabase
     .from("products")
     .select("*")
     .order("name", { ascending: true });
+
   if (error) {
     products = [];
-    rowsEl.innerHTML = '<tr><td colspan="8" class="empty">No se pudo cargar el inventario. Revisa los permisos de la tabla products.</td></tr>';
+
+    rowsEl.innerHTML =
+      '<tr><td colspan="8" class="empty">No se pudo cargar el inventario.</td></tr>';
+
     say($("#list-message"), error.message);
     updateStats();
     return;
   }
+
   products = data || [];
+
   renderProducts();
   updateStats();
 }
 
+// Actualizar estadísticas.
 function updateStats() {
-  const active = products.filter(p => p.is_active !== false);
-  $("#stat-products").textContent = String(active.length);
-  $("#stat-units").textContent = String(active.reduce((sum, p) => sum + numeric(p.stock), 0));
-  $("#stat-low").textContent = String(active.filter(p => numeric(p.stock) <= numeric(p.stock_minimum ?? p.min_stock ?? 3)).length);
+  const activeProducts = products.filter(
+    (product) => product.is_active !== false
+  );
+
+  $("#stat-products").textContent = String(activeProducts.length);
+
+  $("#stat-units").textContent = String(
+    activeProducts.reduce(
+      (total, product) => total + numeric(product.stock),
+      0
+    )
+  );
+
+  $("#stat-low").textContent = String(
+    activeProducts.filter(
+      (product) =>
+        numeric(product.stock) <=
+        numeric(product.stock_minimum ?? product.min_stock ?? 3)
+    ).length
+  );
 }
 
+// Mostrar productos y acciones según los permisos.
 function renderProducts() {
-  const q = $("#inventory-search").value.trim().toLocaleLowerCase();
-  const filtered = products.filter(p => {
-    const haystack = [p.name, p.sku, p.category].map(v => String(v ?? "").toLocaleLowerCase()).join(" ");
-    return haystack.includes(q);
+  const search = $("#inventory-search")
+    .value
+    .trim()
+    .toLocaleLowerCase();
+
+  const filteredProducts = products.filter((product) => {
+    const searchableText = [
+      product.name,
+      product.sku,
+      product.category
+    ]
+      .map((value) => String(value ?? "").toLocaleLowerCase())
+      .join(" ");
+
+    return searchableText.includes(search);
   });
-  if (!filtered.length) {
-    rowsEl.innerHTML = '<tr><td colspan="8" class="empty">No hay productos que coincidan con la búsqueda.</td></tr>';
+
+  if (!filteredProducts.length) {
+    rowsEl.innerHTML =
+      '<tr><td colspan="8" class="empty">No hay productos que coincidan con la búsqueda.</td></tr>';
     return;
   }
-  rowsEl.innerHTML = filtered.map(p => {
-    const stock = numeric(p.stock);
-    const minimum = numeric(p.stock_minimum ?? p.min_stock ?? 3);
-    const status = p.is_active === false ? "Inactivo" : stock <= 0 ? "Agotado" : stock <= minimum ? "Stock bajo" : "Disponible";
-    const pill = p.is_active === false || stock <= 0 ? "stock-out" : stock <= minimum ? "stock-low" : "";
-    const actions = canManage
-      ? `<button class="row-btn" data-edit="${esc(p.id)}">Editar</button><button class="row-btn" data-stock="${esc(p.id)}">Ajustar stock</button>`
-      : "Solo lectura";
-    return `<tr>
-      <td><strong>${esc(p.name)}</strong></td><td>${esc(p.sku || "—")}</td><td>${esc(p.category || "—")}</td>
-      <td>${esc(money(p.cost_price ?? p.purchase_price ?? 0))}</td><td>${esc(money(p.sale_price ?? 0))}</td>
-      <td>${stock}</td><td><span class="stock-pill ${pill}">${status}</span></td><td>${actions}</td>
-    </tr>`;
+
+  rowsEl.innerHTML = filteredProducts.map((product) => {
+    const stock = numeric(product.stock);
+
+    const minimum = numeric(
+      product.stock_minimum ?? product.min_stock ?? 3
+    );
+
+    const status =
+      product.is_active === false
+        ? "Inactivo"
+        : stock <= 0
+          ? "Agotado"
+          : stock <= minimum
+            ? "Stock bajo"
+            : "Disponible";
+
+    const statusClass =
+      product.is_active === false || stock <= 0
+        ? "stock-out"
+        : stock <= minimum
+          ? "stock-low"
+          : "";
+
+    const actions = [
+      canEdit
+        ? `<button type="button" class="row-btn" data-edit="${esc(product.id)}">Editar</button>`
+        : "",
+      canEdit
+        ? `<button type="button" class="row-btn" data-stock="${esc(product.id)}">Ajustar stock</button>`
+        : ""
+    ].filter(Boolean).join(" ") || "Solo lectura";
+
+    return `
+      <tr>
+        <td><strong>${esc(product.name)}</strong></td>
+        <td>${esc(product.sku || "—")}</td>
+        <td>${esc(product.category || "—")}</td>
+        <td>${esc(money(product.cost_price ?? product.purchase_price ?? 0))}</td>
+        <td>${esc(money(product.sale_price ?? 0))}</td>
+        <td>${stock}</td>
+        <td>
+          <span class="stock-pill ${statusClass}">
+            ${status}
+          </span>
+        </td>
+        <td>${actions}</td>
+      </tr>
+    `;
   }).join("");
-  rowsEl.querySelectorAll("[data-edit]").forEach(b => b.addEventListener("click", () => beginEdit(b.dataset.edit)));
-  rowsEl.querySelectorAll("[data-stock]").forEach(b => b.addEventListener("click", () => adjustStock(b.dataset.stock)));
+
+  rowsEl.querySelectorAll("[data-edit]").forEach((button) => {
+    button.addEventListener("click", () => {
+      beginEdit(button.dataset.edit);
+    });
+  });
+
+  rowsEl.querySelectorAll("[data-stock]").forEach((button) => {
+    button.addEventListener("click", () => {
+      adjustStock(button.dataset.stock);
+    });
+  });
 }
 
+// Restablecer formulario.
 function resetForm() {
   form.reset();
+
   $("#product-id").value = "";
   $("#product-cost").value = "0";
   $("#product-stock").value = "0";
   $("#product-minimum").value = "3";
-  $("#form-title").textContent = "Agregar producto";
+
+  $("#form-title").textContent = canCreate
+    ? "Agregar producto"
+    : "Inventario (edición limitada)";
+
   $("#save-product").textContent = "Guardar producto";
   $("#cancel-edit").hidden = true;
+
   $("#product-stock").readOnly = false;
   $("#product-stock").title = "";
+
+  // El usuario que solo puede editar no puede crear productos nuevos.
+  $("#save-product").hidden = !canCreate;
+
+  applyFormPermissions();
 }
+
+// Aplicar permisos a los campos.
+function applyFormPermissions() {
+  const fieldIds = [
+    "#product-name",
+    "#product-sku",
+    "#product-category",
+    "#product-cost",
+    "#product-price",
+    "#product-stock",
+    "#product-minimum"
+  ];
+
+  fieldIds.forEach((selector) => {
+    const element = $(selector);
+    if (element) element.disabled = !canCreate && !canEdit;
+  });
+
+  if (!canCreate && !canEdit) {
+    form.querySelectorAll("input, button").forEach((element) => {
+      if (element.id !== "inventory-logout") {
+        element.disabled = true;
+      }
+    });
+  }
+
+  $("#save-product").hidden = !canCreate && !canEdit;
+}
+
+// Preparar edición.
 function beginEdit(id) {
-  const p = products.find(x => String(x.id) === String(id));
-  if (!p) return;
-  $("#product-id").value = p.id;
-  $("#product-name").value = p.name || "";
-  $("#product-sku").value = p.sku || "";
-  $("#product-category").value = p.category || "";
-  $("#product-cost").value = p.cost_price ?? p.purchase_price ?? 0;
-  $("#product-price").value = p.sale_price ?? 0;
-  $("#product-stock").value = p.stock ?? 0;
-  $("#product-minimum").value = p.stock_minimum ?? p.min_stock ?? 3;
-  // Do not alter stock through ordinary product editing. Use the stock adjustment action.
+  if (!canEdit) {
+    say($("#form-message"), "No tienes permiso para editar productos.");
+    return;
+  }
+
+  const product = products.find(
+    (item) => String(item.id) === String(id)
+  );
+
+  if (!product) return;
+
+  $("#product-id").value = product.id;
+  $("#product-name").value = product.name || "";
+  $("#product-sku").value = product.sku || "";
+  $("#product-category").value = product.category || "";
+
+  $("#product-cost").value =
+    product.cost_price ?? product.purchase_price ?? 0;
+
+  $("#product-price").value = product.sale_price ?? 0;
+  $("#product-stock").value = product.stock ?? 0;
+
+  $("#product-minimum").value =
+    product.stock_minimum ?? product.min_stock ?? 3;
+
+  // El stock se cambia mediante Ajustar stock.
   $("#product-stock").readOnly = true;
-  $("#product-stock").title = "Para cambiar existencias, utiliza Ajustar stock.";
+  $("#product-stock").title =
+    "Para cambiar existencias, utiliza Ajustar stock.";
+
   $("#form-title").textContent = "Editar producto";
   $("#save-product").textContent = "Guardar cambios";
+  $("#save-product").hidden = false;
   $("#cancel-edit").hidden = false;
-  say($("#form-message"), "Al editar, el stock se conserva. Usa «Ajustar stock» para registrar una entrada o salida.", true);
+
+  // Si solo puede editar, puede modificar los campos de un producto existente.
+  form.querySelectorAll("input").forEach((element) => {
+    if (element.id !== "product-id") {
+      element.disabled = false;
+    }
+  });
+
+  say(
+    $("#form-message"),
+    "Al editar, el stock se conserva. Usa «Ajustar stock» para registrar una entrada o salida.",
+    true
+  );
+
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
+// Ajustar stock.
 async function adjustStock(id) {
-  const p = products.find(x => String(x.id) === String(id));
-  if (!p) return;
-  const raw = window.prompt(
-    `Producto: ${p.name}\nStock actual: ${p.stock}\n\nIntroduce el ajuste con signo:\n+5 para entrada de 5 unidades\n-2 para salida de 2 unidades`,
-    "+1"
-  );
-  if (raw === null) return;
-  const delta = Number(raw.trim());
-  if (!Number.isInteger(delta) || delta === 0) {
-    say($("#list-message"), "Escribe un número entero distinto de cero, por ejemplo +5 o -2.");
+  if (!canEdit) {
+    say($("#list-message"), "No tienes permiso para ajustar el stock.");
     return;
   }
-  const nextStock = numeric(p.stock) + delta;
+
+  const product = products.find(
+    (item) => String(item.id) === String(id)
+  );
+
+  if (!product) return;
+
+  const raw = window.prompt(
+    `Producto: ${product.name}\n` +
+    `Stock actual: ${product.stock}\n\n` +
+    "Introduce el ajuste con signo:\n" +
+    "+5 para entrada de 5 unidades\n" +
+    "-2 para salida de 2 unidades",
+    "+1"
+  );
+
+  if (raw === null) return;
+
+  const delta = Number(raw.trim());
+
+  if (!Number.isInteger(delta) || delta === 0) {
+    say(
+      $("#list-message"),
+      "Escribe un número entero distinto de cero, por ejemplo +5 o -2."
+    );
+    return;
+  }
+
+  const nextStock = numeric(product.stock) + delta;
+
   if (nextStock < 0) {
     say($("#list-message"), "El stock no puede quedar por debajo de cero.");
     return;
   }
-  // Uses the current products table only; no new table or database schema is created.
-  const { error } = await supabase.from("products").update({ stock: nextStock }).eq("id", p.id);
+
+  const { error } = await supabase
+    .from("products")
+    .update({ stock: nextStock })
+    .eq("id", product.id);
+
   if (error) {
-    say($("#list-message"), `No se pudo ajustar el stock: ${error.message}`);
+    say(
+      $("#list-message"),
+      `No se pudo ajustar el stock: ${error.message}`
+    );
     return;
   }
-  say($("#list-message"), `Stock actualizado: ${p.name} (${p.stock} → ${nextStock}).`, true);
+
+  say(
+    $("#list-message"),
+    `Stock actualizado: ${product.name} (${product.stock} → ${nextStock}).`,
+    true
+  );
+
   await loadProducts();
 }
 
+// Guardar producto nuevo o cambios.
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
-  if (!canManage) return say($("#form-message"), "Solo el administrador puede modificar el inventario.");
+
   const id = $("#product-id").value.trim();
+  const isEditing = Boolean(id);
+
+  if (isEditing && !canEdit) {
+    say($("#form-message"), "No tienes permiso para editar productos.");
+    return;
+  }
+
+  if (!isEditing && !canCreate) {
+    say($("#form-message"), "No tienes permiso para agregar productos.");
+    return;
+  }
+
   const name = $("#product-name").value.trim();
   const sku = $("#product-sku").value.trim() || null;
   const category = $("#product-category").value.trim() || null;
+
   const cost = Number($("#product-cost").value);
   const price = Number($("#product-price").value);
   const stock = Number($("#product-stock").value);
   const minimum = Number($("#product-minimum").value);
 
-  if (!name) return say($("#form-message"), "El nombre del producto es obligatorio.");
-  if (!Number.isFinite(cost) || cost < 0) return say($("#form-message"), "El precio de compra no puede ser negativo.");
-  if (!Number.isFinite(price) || price <= 0) return say($("#form-message"), "El precio de venta debe ser mayor que cero.");
-  if (!Number.isInteger(stock) || stock < 0) return say($("#form-message"), "El stock debe ser un entero igual o mayor que cero.");
-  if (!Number.isInteger(minimum) || minimum < 0) return say($("#form-message"), "El stock mínimo debe ser un entero igual o mayor que cero.");
-  if (sku && products.some(p => String(p.sku || "").toLocaleLowerCase() === sku.toLocaleLowerCase() && String(p.id) !== id)) {
-    return say($("#form-message"), "Ya existe un producto con ese código / SKU.");
+  if (!name) {
+    return say($("#form-message"), "El nombre del producto es obligatorio.");
+  }
+
+  if (!Number.isFinite(cost) || cost < 0) {
+    return say($("#form-message"), "El precio de compra no puede ser negativo.");
+  }
+
+  if (!Number.isFinite(price) || price <= 0) {
+    return say($("#form-message"), "El precio de venta debe ser mayor que cero.");
+  }
+
+  if (!isEditing && (!Number.isInteger(stock) || stock < 0)) {
+    return say(
+      $("#form-message"),
+      "El stock debe ser un entero igual o mayor que cero."
+    );
+  }
+
+  if (!Number.isInteger(minimum) || minimum < 0) {
+    return say(
+      $("#form-message"),
+      "El stock mínimo debe ser un entero igual o mayor que cero."
+    );
+  }
+
+  if (
+    sku &&
+    products.some(
+      (product) =>
+        String(product.sku || "").toLocaleLowerCase() ===
+          sku.toLocaleLowerCase() &&
+        String(product.id) !== id
+    )
+  ) {
+    return say(
+      $("#form-message"),
+      "Ya existe un producto con ese código / SKU."
+    );
   }
 
   const button = $("#save-product");
   button.disabled = true;
   button.textContent = "Guardando…";
+
   try {
-    const existing = id ? products.find(p => String(p.id) === id) : null;
-    // These are the existing product columns used by the app; optional columns are only
-    // included if already present in the current row to avoid assuming a new schema.
-    const payload = { name, sku, sale_price: price, stock, is_active: existing?.is_active ?? true };
-    if (products.some(p => "category" in p) || !products.length) payload.category = category;
-    if (products.some(p => "cost_price" in p)) payload.cost_price = cost;
-    else if (products.some(p => "purchase_price" in p)) payload.purchase_price = cost;
-    if (products.some(p => "stock_minimum" in p)) payload.stock_minimum = minimum;
-    else if (products.some(p => "min_stock" in p)) payload.min_stock = minimum;
+    const existing = isEditing
+      ? products.find((product) => String(product.id) === id)
+      : null;
+
+    const payload = {
+      name,
+      sku,
+      sale_price: price,
+      is_active: existing?.is_active ?? true
+    };
+
+    if (!isEditing) {
+      payload.stock = stock;
+    }
+
+    if (products.some((product) => "category" in product) || !products.length) {
+      payload.category = category;
+    }
+
+    if (products.some((product) => "cost_price" in product)) {
+      payload.cost_price = cost;
+    } else if (products.some((product) => "purchase_price" in product)) {
+      payload.purchase_price = cost;
+    }
+
+    if (products.some((product) => "stock_minimum" in product)) {
+      payload.stock_minimum = minimum;
+    } else if (products.some((product) => "min_stock" in product)) {
+      payload.min_stock = minimum;
+    }
 
     let result;
-    if (id) {
-      // Preserve current stock during edit; stock is managed with the adjustment button.
-      delete payload.stock;
-      result = await supabase.from("products").update(payload).eq("id", id);
+
+    if (isEditing) {
+      result = await supabase
+        .from("products")
+        .update(payload)
+        .eq("id", id);
     } else {
-      result = await supabase.from("products").insert(payload);
+      result = await supabase
+        .from("products")
+        .insert(payload);
     }
+
     if (result.error) throw result.error;
-    say($("#form-message"), id ? "Producto actualizado correctamente." : "Producto registrado correctamente.", true);
+
+    say(
+      $("#form-message"),
+      isEditing
+        ? "Producto actualizado correctamente."
+        : "Producto registrado correctamente.",
+      true
+    );
+
     resetForm();
     await loadProducts();
   } catch (error) {
-    say($("#form-message"), error?.message || "No se pudo guardar el producto.");
+    say(
+      $("#form-message"),
+      error?.message || "No se pudo guardar el producto."
+    );
   } finally {
     button.disabled = false;
-    button.textContent = $("#product-id").value ? "Guardar cambios" : "Guardar producto";
+    button.textContent = $("#product-id").value
+      ? "Guardar cambios"
+      : "Guardar producto";
   }
 });
 
@@ -200,11 +517,21 @@ $("#cancel-edit").addEventListener("click", () => {
   resetForm();
   $("#form-message").textContent = "";
 });
+
 $("#inventory-search").addEventListener("input", renderProducts);
 
-if (!canManage) {
-  form.querySelectorAll("input,button").forEach(el => { if (el.id !== "inventory-logout") el.disabled = true; });
+// Configurar la interfaz inicial según los permisos.
+if (!canCreate && !canEdit) {
   $("#form-title").textContent = "Inventario (solo lectura)";
   $("#save-product").hidden = true;
+  form.querySelectorAll("input, button").forEach((element) => {
+    if (element.id !== "inventory-logout") {
+      element.disabled = true;
+    }
+  });
+} else if (!canCreate && canEdit) {
+  $("#form-title").textContent = "Inventario (edición limitada)";
+  $("#save-product").hidden = true;
 }
+
 await loadProducts();
