@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#090909">
+
+  <title>Panel del vendedor · Smok Game</title>
+
+  <link rel="stylesheet" href="assets/css/app.css">
+  <link rel="stylesheet" href="assets/css/vendedor.css">
+</head>
+
+<body class="seller-body">
+
+  <aside class="seller-sidebar">
+    <a href="vendedor.html" class="seller-brand">
+      <img src="assets/smok-game-neon.jpg" alt="Smok Game">
+      <span>SMOK GAME<small>Panel de vendedor</small></span>
+    </a>
+
+    <nav class="seller-nav" aria-label="Menú principal">
+      <button class="seller-nav-item active" data-section="inicio">
+        <span>⌂</span> Inicio
+      </button>
+
+      <button class="seller-nav-item" data-section="caja">
+        <span>▣</span> Abrir caja
+      </button>
+
+      <button class="seller-nav-item" data-section="ventas">
+        <span>🛒</span> Ventas
+      </button>
+
+      <button class="seller-nav-item" data-section="inventario">
+        <span>▤</span> Inventario
+      </button>
+
+      <button class="seller-nav-item" data-section="cierre">
+        <span>🔒</span> Cerrar caja
+      </button>
+
+      <button class="seller-nav-item" data-section="arqueo">
+        <span>▦</span> Arqueo de caja
+      </button>
+    </nav>
+
+    <div class="seller-sidebar-bottom">
+      <div class="seller-user">
+        <div class="seller-avatar" id="seller-avatar">V</div>
+        <div>
+          <strong id="seller-name">Vendedor</strong>
+          <small>Personal de tienda</small>
+        </div>
+      </div>
+
+      <button id="seller-logout" class="seller-logout">
+        ↪ Cerrar sesión
+      </button>
+    </div>
+  </aside>
+
+  <main class="seller-main">
+
+    <header class="seller-topbar">
+      <div>
+        <p class="seller-eyebrow">SMOK GAME / OPERACIONES</p>
+        <h1 id="seller-page-title">Inicio</h1>
+      </div>
+
+      <div class="seller-status">
+        <span class="seller-status-dot"></span>
+        <span id="seller-cash-status">Comprobando caja…</span>
+      </div>
+    </header>
+
+    <div id="seller-message" class="seller-message" role="status"></div>
+
+    <!-- INICIO -->
+    <section class="seller-section" id="section-inicio">
+      <div class="seller-welcome">
+        <div>
+          <p class="seller-eyebrow">PANEL DE TRABAJO</p>
+          <h2>Hola, <span id="seller-welcome-name">vendedor</span>.</h2>
+          <p>Todo listo para trabajar. Selecciona una operación para comenzar.</p>
+        </div>
+        <div class="seller-welcome-icon">SG</div>
+      </div>
+
+      <div class="seller-stats">
+        <article class="seller-stat-card">
+          <span>Estado de caja</span>
+          <strong id="seller-stat-cash">Verificando</strong>
+          <small>Turno actual</small>
+        </article>
+
+        <article class="seller-stat-card">
+          <span>Productos disponibles</span>
+          <strong id="seller-stat-products">—</strong>
+          <small>Inventario activo</small>
+        </article>
+
+        <article class="seller-stat-card">
+          <span>Mi usuario</span>
+          <strong id="seller-stat-user">—</strong>
+          <small>Sesión actual</small>
+        </article>
+      </div>
+
+      <h2 class="seller-section-heading">Accesos rápidos</h2>
+
+      <div class="seller-quick-grid">
+        <button class="seller-quick-card" data-section="caja">
+          <span class="seller-quick-icon">▣</span>
+          <strong>Abrir caja</strong>
+          <small>Iniciar el turno</small>
+          <span class="seller-quick-arrow">↗</span>
+        </button>
+
+        <button class="seller-quick-card" data-section="ventas">
+          <span class="seller-quick-icon">🛒</span>
+          <strong>Nueva venta</strong>
+          <small>Registrar una venta</small>
+          <span class="seller-quick-arrow">↗</span>
+        </button>
+
+        <button class="seller-quick-card" data-section="inventario">
+          <span class="seller-quick-icon">▤</span>
+          <strong>Inventario</strong>
+          <small>Consultar productos</small>
+          <span class="seller-quick-arrow">↗</span>
+        </button>
+
+        <button class="seller-quick-card" data-section="arqueo">
+          <span class="seller-quick-icon">▦</span>
+          <strong>Arqueo</strong>
+          <small>Comprobar efectivo</small>
+          <span class="seller-quick-arrow">↗</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- ABRIR CAJA -->
+    <section class="seller-section" id="section-caja" hidden>
+      <div class="seller-panel">
+        <div class="seller-panel-heading">
+          <div>
+            <p class="seller-eyebrow">TURNO DE TRABAJO</p>
+            <h2>Abrir caja</h2>
+            <p>Registra el efectivo inicial antes de comenzar a vender.</p>
+          </div>
+          <span class="seller-panel-icon">▣</span>
+        </div>
+
+        <form id="seller-open-form" class="seller-form">
+          <label for="seller-opening-amount">Fondo inicial (Bs)</label>
+          <input
+            id="seller-opening-amount"
+            type="number"
+            min="0"
+            step="0.01"
+            value="0"
+            required
+          >
+
+          <button type="submit" class="seller-primary-btn" id="seller-open-btn">
+            Abrir caja
+          </button>
+        </form>
+
+        <p class="seller-help">
+          Si ya tienes una caja abierta, no abras otra. Comprueba primero el estado del turno.
+        </p>
+      </div>
+    </section>
+
+    <!-- VENTAS -->
+    <section class="seller-section" id="section-ventas" hidden>
+      <div class="seller-panel">
+        <div class="seller-panel-heading">
+          <div>
+            <p class="seller-eyebrow">PUNTO DE VENTA</p>
+            <h2>Ventas</h2>
+            <p>Registra las ventas de la tienda.</p>
+          </div>
+          <span class="seller-panel-icon">🛒</span>
+        </div>
+
+        <div class="seller-notice">
+          El módulo de ventas se conectará a la función de ventas existente de Smok Game.
+          No se creará un sistema de ventas paralelo.
+        </div>
+
+        <a class="seller-primary-btn seller-link-btn" href="sales.html">
+          Ir al módulo de ventas ↗
+        </a>
+      </div>
+    </section>
+
+    <!-- INVENTARIO -->
+    <section class="seller-section" id="section-inventario" hidden>
+      <div class="seller-panel">
+        <div class="seller-panel-heading">
+          <div>
+            <p class="seller-eyebrow">PRODUCTOS</p>
+            <h2>Inventario</h2>
+            <p>Consulta los productos y registra nuevos artículos.</p>
+          </div>
+          <span class="seller-panel-icon">▤</span>
+        </div>
+
+        <div class="seller-notice">
+          Abre el inventario existente para consultar, agregar o modificar productos
+          según los permisos de tu cuenta.
+        </div>
+
+        <a class="seller-primary-btn seller-link-btn" href="inventory.html">
+          Ir al inventario ↗
+        </a>
+      </div>
+    </section>
+
+    <!-- CERRAR CAJA -->
+    <section class="seller-section" id="section-cierre" hidden>
+      <div class="seller-panel">
+        <div class="seller-panel-heading">
+          <div>
+            <p class="seller-eyebrow">FINALIZAR TURNO</p>
+            <h2>Cerrar caja</h2>
+            <p>Prepara el cierre del turno de trabajo.</p>
+          </div>
+          <span class="seller-panel-icon">🔒</span>
+        </div>
+
+        <div class="seller-notice">
+          Antes de cerrar, verifica las ventas, los movimientos y el efectivo disponible.
+          El cierre debe quedar registrado en la base de datos.
+        </div>
+
+        <button id="seller-go-arqueo" class="seller-primary-btn" type="button">
+          Ir al arqueo de caja
+        </button>
+      </div>
+    </section>
+
+    <!-- ARQUEO -->
+    <section class="seller-section" id="section-arqueo" hidden>
+      <div class="seller-panel">
+        <div class="seller-panel-heading">
+          <div>
+            <p class="seller-eyebrow">CONTROL DE EFECTIVO</p>
+            <h2>Arqueo de caja</h2>
+            <p>Compara el efectivo esperado con el dinero contado.</p>
+          </div>
+          <span class="seller-panel-icon">▦</span>
+        </div>
+
+        <div class="seller-notice">
+          El arqueo se conectará a los movimientos y las ventas del turno activo.
+          Los pagos QR se contabilizan por separado del efectivo físico.
+        </div>
+      </div>
+    </section>
+
+    <!-- MI CUENTA -->
+    <section class="seller-section" id="section-cuenta" hidden>
+      <div class="seller-panel">
+        <div class="seller-panel-heading">
+          <div>
+            <p class="seller-eyebrow">CUENTA PERSONAL</p>
+            <h2>Mi cuenta</h2>
+            <p>Información de tu sesión actual.</p>
+          </div>
+          <span class="seller-panel-icon">👤</span>
+        </div>
+
+        <dl class="seller-account-details">
+          <div>
+            <dt>Nombre</dt>
+            <dd id="seller-account-name">—</dd>
+          </div>
+          <div>
+            <dt>Usuario</dt>
+            <dd id="seller-account-username">—</dd>
+          </div>
+          <div>
+            <dt>Rol</dt>
+            <dd>Vendedor</dd>
+          </div>
+        </dl>
+      </div>
+    </section>
+
+    <footer class="seller-footer">
+      SMOK GAME · Sistema de gestión
+    </footer>
+
+  </main>
+
+  <script type="module" src="assets/js/vendedor.js"></script>
+</body>
+</html>
