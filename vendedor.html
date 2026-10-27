@@ -244,23 +244,36 @@
     </section>
 
     <!-- ARQUEO -->
-    <section class="seller-section" id="section-arqueo" hidden>
-      <div class="seller-panel">
-        <div class="seller-panel-heading">
-          <div>
-            <p class="seller-eyebrow">CONTROL DE EFECTIVO</p>
-            <h2>Arqueo de caja</h2>
-            <p>Compara el efectivo esperado con el dinero contado.</p>
-          </div>
-          <span class="seller-panel-icon">▦</span>
-        </div>
-
-        <div class="seller-notice">
-          El arqueo se conectará a los movimientos y las ventas del turno activo.
-          Los pagos QR se contabilizan por separado del efectivo físico.
-        </div>
+<section class="seller-section" id="section-arqueo" hidden>
+  <div class="seller-panel">
+    <div class="seller-panel-heading">
+      <div>
+        <p class="seller-eyebrow">FINALIZAR TURNO</p>
+        <h2>Arqueo de caja</h2>
+        <p>Introduce los importes que contaste al finalizar tu turno.</p>
       </div>
-    </section>
+      <span class="seller-panel-icon">▦</span>
+    </div>
+
+    <form id="seller-close-form" class="seller-form">
+      <label for="seller-counted-cash">Efectivo contado (Bs)</label>
+      <input id="seller-counted-cash" type="number"
+             min="0" max="9999999999.99" step="0.01" required>
+
+      <label for="seller-qr-declared">Total QR declarado (Bs)</label>
+      <input id="seller-qr-declared" type="number"
+             min="0" max="9999999999.99" step="0.01" required>
+
+      <label for="seller-close-note">Observaciones (opcional)</label>
+      <textarea id="seller-close-note" rows="3" maxlength="500"
+                placeholder="Observaciones del cierre"></textarea>
+
+      <button type="submit" class="seller-primary-btn" id="seller-close-btn">
+        Confirmar arqueo y cerrar caja
+      </button>
+    </form>
+  </div>
+</section>
 
     <!-- MI CUENTA -->
     <section class="seller-section" id="section-cuenta" hidden>
