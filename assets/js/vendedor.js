@@ -1,4 +1,8 @@
-import { supabase, requireSession } from "./supabase.js";
+import {
+  supabase,
+  requireSession,
+  hasPermission
+} from "./supabase.js";
 
 const auth = await requireSession();
 
@@ -8,18 +12,16 @@ if (!auth) {
 
 const { profile } = auth;
 
-// Esta página es exclusiva para trabajadores.
 if (profile.role !== "worker") {
   location.replace("app.html");
   throw new Error("Esta interfaz es exclusiva para vendedores.");
 }
 
-const $ = (selector) => document.querySelector(selector);
+const $ = selector => document.querySelector(selector);
 
 document.documentElement.dataset.theme =
   localStorage.getItem("smok-theme") || "carbon";
 
-// Datos del usuario.
 const displayName = profile.full_name || profile.username || "Vendedor";
 
 $("#seller-name").textContent = displayName;
@@ -29,7 +31,6 @@ $("#seller-account-name").textContent = displayName;
 $("#seller-account-username").textContent = profile.username || "—";
 $("#seller-avatar").textContent = displayName.charAt(0).toUpperCase();
 
-// Navegación entre secciones.
 const titles = {
   inicio: "Inicio",
   caja: "Abrir caja",
@@ -41,11 +42,11 @@ const titles = {
 };
 
 function showSection(name) {
-  document.querySelectorAll(".seller-section").forEach((section) => {
+  document.querySelectorAll(".seller-section").forEach(section => {
     section.hidden = section.id !== `section-${name}`;
   });
 
-  document.querySelectorAll("[data-section]").forEach((button) => {
+  document.querySelectorAll("[data-section]").forEach(button => {
     button.classList.toggle(
       "active",
       button.dataset.section === name
@@ -55,26 +56,23 @@ function showSection(name) {
   $("#seller-page-title").textContent = titles[name] || "Inicio";
 }
 
-document.querySelectorAll("[data-section]").forEach((button) => {
+document.querySelectorAll("[data-section]").forEach(button => {
   button.addEventListener("click", () => {
     showSection(button.dataset.section);
   });
 });
 
-// Mi cuenta se abre desde el área de usuario.
 $("#seller-name").closest(".seller-user").style.cursor = "pointer";
 
 $("#seller-name").closest(".seller-user").addEventListener("click", () => {
   showSection("cuenta");
 });
 
-// Cerrar sesión.
 $("#seller-logout").addEventListener("click", async () => {
   await supabase.auth.signOut();
   location.replace("login.html");
 });
 
-// Consultar el inventario disponible.
 async function loadProductCount() {
   const { count, error } = await supabase
     .from("products")
@@ -82,6 +80,7 @@ async function loadProductCount() {
     .eq("is_active", true);
 
   if (error) {
+    console.error("Error cargando productos:", error);
     $("#seller-stat-products").textContent = "—";
     return;
   }
@@ -89,22 +88,34 @@ async function loadProductCount() {
   $("#seller-stat-products").textContent = String(count ?? 0);
 }
 
-// Consultar si existe una caja abierta.
-// Si no se puede consultar, no asumimos que esté abierta.
+function showCashMessage(text, success = false) {
+  const element = $("#seller-message");
+  if (!element) return;
+
+  element.textContent = text;
+  element.style.color = success ? "#48d597" : "#ff8585";
+}
+
 async function loadCashStatus() {
   const status = $("#seller-cash-status");
   const stat = $("#seller-stat-cash");
+  const amountInput = $("#seller-opening-amount");
+  const openButton = $("#seller-open-btn");
 
   const { data, error } = await supabase
     .from("cash_shifts")
-    .select("id")
+    .select("id,opened_by,opening_amount,opened_at")
     .eq("status", "open")
+    .order("opened_at", { ascending: false })
     .limit(1)
     .maybeSingle();
 
   if (error) {
+    console.error("Error consultando caja:", error);
     status.textContent = "Estado no disponible";
     stat.textContent = "No disponible";
+    amountInput.disabled = true;
+    openButton.disabled = true;
     return;
   }
 
@@ -113,29 +124,86 @@ async function loadCashStatus() {
   status.textContent = isOpen ? "Caja abierta" : "Caja cerrada";
   stat.textContent = isOpen ? "Abierta" : "Cerrada";
 
-  $("#seller-opening-amount").disabled = isOpen;
-  $("#seller-open-btn").disabled = isOpen;
+  amountInput.disabled = isOpen;
+  openButton.disabled = isOpen;
 
-  if (isOpen) {
-    $("#seller-open-btn").textContent = "Ya existe una caja abierta";
+  openButton.textContent = isOpen
+    ? "Ya existe una caja abierta"
+    : "Abrir caja";
+
+  if (isOpen && data.opened_by !== profile.id) {
+    showCashMessage(
+      "Ya existe una caja abierta por otro usuario. No puedes abrir otra."
+    );
+  } else if (isOpen) {
+    showCashMessage(
+      `Tu caja está abierta. Fondo inicial: ${Number(data.opening_amount || 0).toFixed(2)} Bs.`,
+      true
+    );
   }
 }
 
-// Navegación al arqueo desde el cierre.
 $("#seller-go-arqueo").addEventListener("click", () => {
   showSection("arqueo");
 });
 
-// Apertura de caja pendiente de conectar a la función real.
-$("#seller-open-form").addEventListener("submit", async (event) => {
+// Apertura conectada a la función existente de Supabase.
+$("#seller-open-form").addEventListener("submit", async event => {
   event.preventDefault();
 
-  const message = $("#seller-message");
+  const button = $("#seller-open-btn");
 
-  message.textContent =
-    "La apertura de caja debe conectarse a la función de apertura existente en Supabase.";
+  if (!await hasPermission(profile, "cash.open")) {
+    showCashMessage("No tienes permiso para abrir caja.");
+    return;
+  }
 
-  message.style.color = "#e5c27a";
+  const amount = Number($("#seller-opening-amount").value);
+
+  if (
+    !Number.isFinite(amount) ||
+    amount < 0 ||
+    Math.round(amount * 100) !== amount * 100
+  ) {
+    showCashMessage(
+      "Introduce un fondo inicial válido, con un máximo de dos decimales."
+    );
+    return;
+  }
+
+  button.disabled = true;
+  button.textContent = "Abriendo caja…";
+
+  try {
+    const { data, error } = await supabase.rpc("open_cash_shift", {
+      p_opening_amount: amount,
+      p_note: null
+    });
+
+    if (error) throw error;
+
+    if (!data) {
+      throw new Error(
+        "Supabase no devolvió el identificador del turno abierto."
+      );
+    }
+
+    showCashMessage(
+      "Caja abierta correctamente. Ya puedes comenzar a trabajar.",
+      true
+    );
+
+    await loadCashStatus();
+  } catch (error) {
+    console.error("Error abriendo caja:", error);
+
+    showCashMessage(
+      `No se pudo abrir la caja: ${error.message}`
+    );
+
+    button.disabled = false;
+    button.textContent = "Abrir caja";
+  }
 });
 
 await Promise.all([
