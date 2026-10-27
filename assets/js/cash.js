@@ -9,7 +9,7 @@ const auth = await requireSession("cash.view");
 if (!auth) throw new Error("Sesión requerida");
 
 const { profile } = auth;
-const $ = (selector) => document.querySelector(selector);
+const $ = selector => document.querySelector(selector);
 const isAdmin = profile.role === "admin";
 
 document.documentElement.dataset.theme =
@@ -24,18 +24,20 @@ $("#cash-logout").addEventListener("click", async () => {
 });
 
 let shift = null;
-let canOpen = isAdmin ||
-  await hasPermission(profile, "cash.open");
 
-let canMove = isAdmin ||
+const canOpen =
+  isAdmin || await hasPermission(profile, "cash.open");
+
+const canMove =
+  isAdmin ||
   await hasPermission(profile, "cash.income") ||
   await hasPermission(profile, "cash.withdraw");
 
-let canClose = isAdmin ||
-  await hasPermission(profile, "cash.close");
+const canClose =
+  isAdmin || await hasPermission(profile, "cash.close");
 
-let canReconcile = isAdmin ||
-  await hasPermission(profile, "cash.reconcile");
+const canReconcile =
+  isAdmin || await hasPermission(profile, "cash.reconcile");
 
 function message(id, text, ok = false) {
   const element = $(id);
@@ -72,7 +74,8 @@ function setFormPermissions() {
   $("#cash-close-form")
     .querySelectorAll("input, textarea, button")
     .forEach(element => {
-      element.disabled = !canClose || !shift;
+      element.disabled =
+        !(canClose || canReconcile) || !shift;
     });
 
   $("#cash-open-btn").textContent =
@@ -81,35 +84,31 @@ function setFormPermissions() {
   $("#cash-open-btn").disabled =
     !canOpen || Boolean(shift);
 
-  // La vista del vendedor no debe mostrar importes de arqueo.
-  const expectedCard = $("#cash-expected")?.closest(".cash-card");
+  const expectedCard =
+    $("#cash-expected")?.closest(".cash-card");
+
   if (expectedCard) {
     expectedCard.hidden = !isAdmin;
   }
 
-  const closuresSection = $("#cash-closures")?.closest("section");
+  const closuresSection =
+    $("#cash-closures")?.closest("section");
+
   if (closuresSection) {
     closuresSection.hidden = !isAdmin;
   }
 }
 
 async function loadShift() {
-  /*
-   * No utilizamos select("*").
-   * Solicitamos únicamente campos necesarios para el turno abierto.
-   *
-   * IMPORTANTE: esto reduce los datos solicitados desde la interfaz,
-   * pero la protección definitiva de las columnas debe configurarse
-   * también en Supabase.
-   */
   let query = supabase
     .from("cash_shifts")
-    .select("id,cash_register_id,opened_by,opened_at,opening_amount,status,notes")
+    .select(
+      "id,cash_register_id,opened_by,opened_at,opening_amount,status,notes"
+    )
     .eq("status", "open")
     .order("opened_at", { ascending: false })
     .limit(1);
 
-  // Un vendedor solo busca su propio turno.
   if (!isAdmin) {
     query = query.eq("opened_by", profile.id);
   }
@@ -121,17 +120,19 @@ async function loadShift() {
   shift = data || null;
 
   $("#cash-status-title").textContent = shift
-    ? `Caja abierta desde ${new Date(shift.opened_at).toLocaleString("es-BO")}`
+    ? `Caja abierta desde ${
+        new Date(shift.opened_at).toLocaleString("es-BO")
+      }`
     : "Caja cerrada";
 
   $("#cash-opening").textContent =
     money(shift?.opening_amount || 0);
 
   const expectedElement = $("#cash-expected");
-  if (expectedElement) {
-    expectedElement.textContent = isAdmin
-      ? "Consulta el arqueo al cerrar la caja"
-      : "Reservado para administración";
+
+  if (expectedElement && isAdmin) {
+    expectedElement.textContent =
+      "El efectivo esperado se calcula al cerrar.";
   }
 
   setFormPermissions();
@@ -149,11 +150,7 @@ async function loadSalesTotals() {
     return;
   }
 
-  /*
-   * Se filtra por shift_id para evitar incluir ventas
-   * de otros turnos.
-   */
-  const { data: sales, error } = await supabase
+  const { data, error } = await supabase
     .from("sales")
     .select("total,payment_method,status")
     .eq("shift_id", shift.id)
@@ -161,32 +158,29 @@ async function loadSalesTotals() {
 
   if (error) throw error;
 
-  const completed = sales || [];
+  const sales = data || [];
 
-  const cashSales = completed
+  const cashSales = sales
     .filter(sale => sale.payment_method === "efectivo")
     .reduce(
-      (sum, sale) => sum + Number(sale.total || 0),
+      (total, sale) => total + Number(sale.total || 0),
       0
     );
 
-  const qrSales = completed
+  const qrSales = sales
     .filter(sale => sale.payment_method === "qr")
     .reduce(
-      (sum, sale) => sum + Number(sale.total || 0),
+      (total, sale) => total + Number(sale.total || 0),
       0
     );
 
   $("#cash-sales").textContent = money(cashSales);
   $("#cash-qr").textContent = money(qrSales);
 
-  /*
-   * No calculamos ni mostramos el efectivo esperado aquí.
-   * El cálculo oficial se realiza en Supabase al cerrar.
-   */
+  // No calculamos ni mostramos la diferencia en el navegador.
   if (isAdmin) {
     $("#cash-expected").textContent =
-      "Se calcula al cerrar el turno";
+      "Se calcula al cerrar el turno.";
   }
 }
 
@@ -201,7 +195,9 @@ async function loadMovements() {
 
   const { data, error } = await supabase
     .from("cash_movements")
-    .select("created_at,movement_type,payment_method,amount,note")
+    .select(
+      "created_at,movement_type,payment_method,amount,note"
+    )
     .eq("shift_id", shift.id)
     .order("created_at", { ascending: false })
     .limit(50);
@@ -229,18 +225,18 @@ async function loadClosures() {
   const body = $("#cash-closures");
   if (!body) return;
 
-  // No solicitamos el historial confidencial al cargar la página
-  // de un vendedor.
   if (!isAdmin) {
     body.innerHTML =
       '<tr><td colspan="6">Historial reservado para administración.</td></tr>';
     return;
   }
 
+  // El historial administrativo utiliza la vista específica.
   const { data, error } = await supabase
-    .from("cash_shifts")
-    .select("opened_at,closed_at,expected_cash,counted_cash,difference,status")
-    .not("closed_at", "is", null)
+    .from("admin_cash_closures")
+    .select(
+      "opened_at,closed_at,expected_cash,counted_cash,difference,status"
+    )
     .order("closed_at", { ascending: false })
     .limit(20);
 
@@ -283,6 +279,7 @@ async function refresh() {
   }
 }
 
+// APERTURA SEGURA
 $("#cash-open-form").addEventListener("submit", async event => {
   event.preventDefault();
 
@@ -296,11 +293,12 @@ $("#cash-open-form").addEventListener("submit", async event => {
   if (shift) {
     return message(
       "#cash-movement-message",
-      "Ya existe un turno abierto para tu usuario."
+      "Ya tienes un turno abierto."
     );
   }
 
   const amount = Number($("#opening-amount").value);
+  const note = $("#opening-note").value.trim();
 
   if (
     !Number.isFinite(amount) ||
@@ -313,58 +311,40 @@ $("#cash-open-form").addEventListener("submit", async event => {
     );
   }
 
-  const { data: register, error: registerError } = await supabase
-    .from("cash_registers")
-    .select("id")
-    .eq("is_active", true)
-    .limit(1)
-    .maybeSingle();
+  const button = $("#cash-open-btn");
+  button.disabled = true;
 
-  if (registerError) {
-    return message(
+  try {
+    const { error } = await supabase.rpc("open_cash_shift", {
+      p_opening_amount: amount,
+      p_note: note || null
+    });
+
+    if (error) throw error;
+
+    $("#opening-amount").value = "";
+    $("#opening-note").value = "";
+
+    message(
       "#cash-movement-message",
-      registerError.message
+      "Caja abierta correctamente.",
+      true
     );
-  }
 
-  if (!register) {
-    return message(
-      "#cash-movement-message",
-      "No hay una caja activa configurada."
-    );
-  }
+    await refresh();
+  } catch (error) {
+    console.error("Error abriendo caja:", error);
 
-  const { data: newShift, error } = await supabase
-    .from("cash_shifts")
-    .insert({
-      cash_register_id: register.id,
-      opened_by: profile.id,
-      opening_amount: amount,
-      status: "open",
-      notes: $("#opening-note").value.trim() || null
-    })
-    .select("id,cash_register_id,opened_by,opened_at,opening_amount,status,notes")
-    .single();
-
-  if (error) {
-    return message(
+    message(
       "#cash-movement-message",
       `No se pudo abrir la caja: ${error.message}`
     );
+  } finally {
+    button.disabled = false;
   }
-
-  shift = newShift;
-  $("#opening-note").value = "";
-
-  message(
-    "#cash-movement-message",
-    "Caja abierta correctamente.",
-    true
-  );
-
-  await refresh();
 });
 
+// MOVIMIENTOS
 $("#cash-movement-form").addEventListener("submit", async event => {
   event.preventDefault();
 
@@ -457,6 +437,7 @@ $("#cash-movement-form").addEventListener("submit", async event => {
   await refresh();
 });
 
+// CIERRE SEGURO
 $("#cash-close-form").addEventListener("submit", async event => {
   event.preventDefault();
 
@@ -488,14 +469,12 @@ $("#cash-close-form").addEventListener("submit", async event => {
     );
   }
 
-  const confirmed = confirm(
+  if (!confirm(
     `Vas a declarar ${money(counted)} como efectivo contado.\n\n` +
     "Supabase registrará el arqueo y cerrará el turno.\n" +
-    "No se mostrará la diferencia en esta pantalla.\n\n" +
+    "La diferencia no se mostrará en esta pantalla.\n\n" +
     "¿Deseas continuar?"
-  );
-
-  if (!confirmed) return;
+  )) return;
 
   const button = $("#cash-close-btn");
   if (button) button.disabled = true;
@@ -514,13 +493,13 @@ $("#cash-close-form").addEventListener("submit", async event => {
 
     message(
       "#cash-close-message",
-      "El efectivo declarado quedó registrado y el turno se cerró correctamente.",
+      "Efectivo declarado y cierre registrados correctamente.",
       true
     );
 
     await refresh();
   } catch (error) {
-    console.error("Error al cerrar caja:", error);
+    console.error("Error cerrando caja:", error);
 
     message(
       "#cash-close-message",
