@@ -218,12 +218,75 @@ function renderHistory(rows) {
 }
 
 async function loadHistory() {
-  historyEl.innerHTML = `
-    <tr>
-      <td colspan="5" class="empty-row">Cargando ventas…</td>
-    </tr>
-  `;
+  historyEl.innerHTML = `<tr><td colspan="5" class="empty-row">Cargando ventas de la caja abierta…</td></tr>`;
+  $("#history-message").textContent = "";
 
+  const totalEl = $("#shift-sales-total");
+  const noteEl = $("#shift-total-note");
+  totalEl.textContent = money(0);
+  noteEl.textContent = "Calculando ventas del turno abierto…";
+
+  // Solo se consulta la caja abierta. No se modifica ni elimina ningún registro.
+  const { data: shift, error: shiftError } = await supabase
+    .from("cash_shifts")
+    .select("id, opened_at")
+    .eq("status", "open")
+    .limit(1)
+    .maybeSingle();
+
+  if (shiftError) {
+    console.error("Error consultando caja abierta:", shiftError);
+    historyEl.innerHTML = `<tr><td colspan="5" class="empty-row">No se pudo identificar la caja abierta.</td></tr>`;
+    noteEl.textContent = "No se pudo consultar la caja abierta.";
+    $("#history-message").textContent = shiftError.message;
+    return;
+  }
+
+  if (!shift) {
+    salesHistory = [];
+    renderHistory(salesHistory);
+    noteEl.textContent = "No hay una caja abierta.";
+    return;
+  }
+
+  // Se recorren páginas para sumar todas las ventas del turno, no solo las visibles.
+  let shiftTotal = 0;
+  let offset = 0;
+  const pageSize = 500;
+  let hasMore = true;
+
+  while (hasMore) {
+    const { data: pageData, error: totalError } = await supabase
+      .from("sales")
+      .select("total, status")
+      .eq("shift_id", shift.id)
+      .order("created_at", { ascending: true })
+      .range(offset, offset + pageSize - 1);
+
+    if (totalError) {
+      console.error("Error calculando total de caja:", totalError);
+      historyEl.innerHTML = `<tr><td colspan="5" class="empty-row">No se pudo cargar el historial de ventas.</td></tr>`;
+      noteEl.textContent = "No se pudo calcular el total.";
+      $("#history-message").textContent = totalError.message;
+      return;
+    }
+
+    const page = pageData || [];
+    shiftTotal += page.reduce((sum, sale) => {
+      const status = String(sale.status || "").toLowerCase();
+      return ["completed", "completada"].includes(status)
+        ? sum + Number(sale.total || 0)
+        : sum;
+    }, 0);
+
+    hasMore = page.length === pageSize;
+    offset += pageSize;
+  }
+
+  totalEl.textContent = money(shiftTotal);
+  noteEl.textContent = `Ventas completadas desde la apertura · ${new Date(shift.opened_at).toLocaleString("es-BO")}`;
+
+  // La tabla mantiene su diseño y muestra las 100 ventas más recientes de esta caja.
   const { data, error } = await supabase
     .from("sales")
     .select(`
@@ -240,20 +303,13 @@ async function loadHistory() {
         line_total
       )
     `)
+    .eq("shift_id", shift.id)
     .order("created_at", { ascending: false })
     .limit(100);
 
   if (error) {
     console.error("Error cargando historial:", error);
-
-    historyEl.innerHTML = `
-      <tr>
-        <td colspan="5" class="empty-row">
-          No se pudo cargar el historial de ventas.
-        </td>
-      </tr>
-    `;
-
+    historyEl.innerHTML = `<tr><td colspan="5" class="empty-row">No se pudo cargar el historial de ventas.</td></tr>`;
     $("#history-message").textContent = error.message;
     return;
   }
