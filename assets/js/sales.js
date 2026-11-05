@@ -235,8 +235,6 @@ async function loadHistory() {
   totalEl.textContent = money(0);
   noteEl.textContent = "Calculando ventas del turno abierto…";
 
-  // Consultar la caja actualmente abierta.
-  // Esta consulta no modifica ni elimina registros.
   const { data: shift, error: shiftError } = await supabase
     .from("cash_shifts")
     .select("id, opened_at")
@@ -269,7 +267,6 @@ async function loadHistory() {
   }
 
   // Sumar todas las ventas del turno mediante páginas.
-  // Así el total no queda limitado a las 100 ventas visibles.
   let shiftTotal = 0;
   let offset = 0;
   const pageSize = 500;
@@ -320,7 +317,7 @@ async function loadHistory() {
       new Date(shift.opened_at).toLocaleString("es-BO")
     }`;
 
-  // Mostrar las 100 ventas más recientes de esta caja.
+  // Mostrar las 100 ventas más recientes en pantalla.
   const { data, error } = await supabase
     .from("sales")
     .select(`
@@ -402,93 +399,148 @@ $("#history-search").addEventListener("input", () => {
   }));
 });
 
-/* EXPORTACIÓN CSV: compatible con Excel en español. */
-$("#export-csv").addEventListener("click", () => {
-  if (!salesHistory.length) {
-    $("#history-message").textContent =
-      "No hay ventas para exportar.";
+/* EXPORTACIÓN CSV: descarga TODAS las ventas de la caja abierta. */
+$("#export-csv").addEventListener("click", async () => {
+  const button = $("#export-csv");
+  const message = $("#history-message");
 
-    return;
-  }
+  button.disabled = true;
+  message.textContent = "Preparando el reporte completo…";
 
-  const rows = [
-    [
-      "Fecha",
-      "N.º de venta",
-      "Producto",
-      "SKU",
-      "Cantidad",
-      "Precio unitario",
-      "Subtotal",
-      "Método de pago",
-      "Total de venta",
-      "Estado"
-    ]
-  ];
+  try {
+    // Consultar la caja abierta.
+    const { data: shift, error: shiftError } = await supabase
+      .from("cash_shifts")
+      .select("id")
+      .eq("status", "open")
+      .limit(1)
+      .maybeSingle();
 
-  salesHistory.forEach((sale) => {
-    const date = sale.created_at
-      ? new Date(sale.created_at).toLocaleString("es-BO")
-      : "";
+    if (shiftError) throw shiftError;
 
-    const items = sale.sale_items || [];
-
-    if (!items.length) {
-      rows.push([
-        date,
-        sale.receipt_number ?? sale.id ?? "",
-        "Sin detalle disponible",
-        "",
-        "",
-        "",
-        "",
-        methodLabel(sale.payment_method),
-        Number(sale.total || 0).toFixed(2),
-        sale.status || "completada"
-      ]);
-
+    if (!shift) {
+      message.textContent = "No hay una caja abierta para exportar.";
       return;
     }
 
-    items.forEach((item) => {
+    const allSales = [];
+    const pageSize = 500;
+    let offset = 0;
+    let hasMore = true;
+
+    // Descargar todas las ventas en páginas de 500.
+    while (hasMore) {
+      const { data, error } = await supabase
+        .from("sales")
+        .select(`
+          id,
+          created_at,
+          total,
+          payment_method,
+          status,
+          sale_items (
+            product_name_snapshot,
+            sku_snapshot,
+            quantity,
+            unit_price,
+            line_total
+          )
+        `)
+        .eq("shift_id", shift.id)
+        .order("created_at", { ascending: true })
+        .range(offset, offset + pageSize - 1);
+
+      if (error) throw error;
+
+      const page = data || [];
+      allSales.push(...page);
+
+      hasMore = page.length === pageSize;
+      offset += pageSize;
+    }
+
+    // Solo ventas completadas.
+    const completedSales = allSales.filter((sale) => {
+      const status = String(sale.status || "").toLowerCase();
+
+      return ["completed", "completada"].includes(status);
+    });
+
+    if (!completedSales.length) {
+      message.textContent = "No hay ventas completadas para exportar.";
+      return;
+    }
+
+    const rows = [
+      ["Fecha y hora", "Cantidad", "Método de pago", "Total"]
+    ];
+
+    let exportedTotal = 0;
+
+    completedSales.forEach((sale) => {
+      const date = sale.created_at
+        ? new Date(sale.created_at).toLocaleString("es-BO")
+        : "";
+
+      const quantity = (sale.sale_items || []).reduce(
+        (sum, item) => sum + Number(item.quantity || 0),
+        0
+      );
+
+      const saleTotal = Number(sale.total || 0);
+      exportedTotal += saleTotal;
+
       rows.push([
         date,
-        sale.receipt_number ?? sale.id ?? "",
-        item.product_name_snapshot || "Producto",
-        item.sku_snapshot || "",
-        Number(item.quantity || 0),
-        Number(item.unit_price || 0).toFixed(2),
-        Number(item.line_total || 0).toFixed(2),
+        quantity,
         methodLabel(sale.payment_method),
-        Number(sale.total || 0).toFixed(2),
-        sale.status || "completada"
+        saleTotal.toFixed(2)
       ]);
     });
-  });
 
-  // La primera línea indica a Excel que el separador es punto y coma.
-  // El BOM ayuda a conservar correctamente los acentos y caracteres especiales.
-  const csv = "\uFEFFsep=;\r\n" + rows.map((row) =>
-    row.map((value) =>
-      `"${String(value ?? "").replace(/"/g, '""')}"`
-    ).join(";")
-  ).join("\r\n");
+    // Total calculado con exactamente las ventas exportadas.
+    rows.push([
+      "TOTAL VENDIDO",
+      "",
+      "",
+      exportedTotal.toFixed(2)
+    ]);
 
-  const blob = new Blob([csv], {
-    type: "text/csv;charset=utf-8;"
-  });
+    // Formato compatible con Excel en español.
+    const csv = "\uFEFFsep=;\r\n" + rows.map((row) =>
+      row.map((value) =>
+        `"${String(value ?? "").replace(/"/g, '""')}"`
+      ).join(";")
+    ).join("\r\n");
 
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
+    const blob = new Blob([csv], {
+      type: "text/csv;charset=utf-8;"
+    });
 
-  a.href = url;
-  a.download = `smok-game-ventas-${new Date().toISOString().slice(0, 10)}.csv`;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
 
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
+    a.href = url;
+    a.download = `smok-game-reporte-${new Date().toISOString().slice(0, 10)}.csv`;
 
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+    message.textContent =
+      `Reporte descargado: ${completedSales.length} ventas.`;
+
+  } catch (error) {
+    console.error("Error exportando ventas:", error);
+
+    message.textContent =
+      error?.message || "No se pudo generar el reporte.";
+
+  } finally {
+    button.disabled = false;
+  }
 });
 
 /* REGISTRO DE VENTAS: se mantiene la función RPC existente. */
@@ -576,12 +628,14 @@ $("#complete-sale").addEventListener("click", async () => {
     ]);
 
     updateSummary();
+
   } catch (error) {
     console.error("Error registrando venta:", error);
 
     showMessage(
       error?.message || "No se pudo registrar la venta."
     );
+
   } finally {
     button.disabled = false;
     button.textContent = "Confirmar venta";
