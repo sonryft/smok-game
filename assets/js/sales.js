@@ -162,7 +162,7 @@ function renderHistory(rows) {
     historyEl.innerHTML = `
       <tr>
         <td colspan="5" class="empty-row">
-          Todavía no hay ventas registradas.
+          Todavía no hay ventas registradas en esta caja.
         </td>
       </tr>
     `;
@@ -217,16 +217,26 @@ function renderHistory(rows) {
   }).join("");
 }
 
+/* CARGA DEL HISTORIAL Y TOTAL DE LA CAJA ABIERTA. */
 async function loadHistory() {
-  historyEl.innerHTML = `<tr><td colspan="5" class="empty-row">Cargando ventas de la caja abierta…</td></tr>`;
+  historyEl.innerHTML = `
+    <tr>
+      <td colspan="5" class="empty-row">
+        Cargando ventas de la caja abierta…
+      </td>
+    </tr>
+  `;
+
   $("#history-message").textContent = "";
 
   const totalEl = $("#shift-sales-total");
   const noteEl = $("#shift-total-note");
+
   totalEl.textContent = money(0);
   noteEl.textContent = "Calculando ventas del turno abierto…";
 
-  // Solo se consulta la caja abierta. No se modifica ni elimina ningún registro.
+  // Consultar la caja actualmente abierta.
+  // Esta consulta no modifica ni elimina registros.
   const { data: shift, error: shiftError } = await supabase
     .from("cash_shifts")
     .select("id, opened_at")
@@ -236,7 +246,15 @@ async function loadHistory() {
 
   if (shiftError) {
     console.error("Error consultando caja abierta:", shiftError);
-    historyEl.innerHTML = `<tr><td colspan="5" class="empty-row">No se pudo identificar la caja abierta.</td></tr>`;
+
+    historyEl.innerHTML = `
+      <tr>
+        <td colspan="5" class="empty-row">
+          No se pudo identificar la caja abierta.
+        </td>
+      </tr>
+    `;
+
     noteEl.textContent = "No se pudo consultar la caja abierta.";
     $("#history-message").textContent = shiftError.message;
     return;
@@ -245,11 +263,13 @@ async function loadHistory() {
   if (!shift) {
     salesHistory = [];
     renderHistory(salesHistory);
+
     noteEl.textContent = "No hay una caja abierta.";
     return;
   }
 
-  // Se recorren páginas para sumar todas las ventas del turno, no solo las visibles.
+  // Sumar todas las ventas del turno mediante páginas.
+  // Así el total no queda limitado a las 100 ventas visibles.
   let shiftTotal = 0;
   let offset = 0;
   const pageSize = 500;
@@ -265,15 +285,25 @@ async function loadHistory() {
 
     if (totalError) {
       console.error("Error calculando total de caja:", totalError);
-      historyEl.innerHTML = `<tr><td colspan="5" class="empty-row">No se pudo cargar el historial de ventas.</td></tr>`;
+
+      historyEl.innerHTML = `
+        <tr>
+          <td colspan="5" class="empty-row">
+            No se pudo cargar el historial de ventas.
+          </td>
+        </tr>
+      `;
+
       noteEl.textContent = "No se pudo calcular el total.";
       $("#history-message").textContent = totalError.message;
       return;
     }
 
     const page = pageData || [];
+
     shiftTotal += page.reduce((sum, sale) => {
       const status = String(sale.status || "").toLowerCase();
+
       return ["completed", "completada"].includes(status)
         ? sum + Number(sale.total || 0)
         : sum;
@@ -284,9 +314,13 @@ async function loadHistory() {
   }
 
   totalEl.textContent = money(shiftTotal);
-  noteEl.textContent = `Ventas completadas desde la apertura · ${new Date(shift.opened_at).toLocaleString("es-BO")}`;
 
-  // La tabla mantiene su diseño y muestra las 100 ventas más recientes de esta caja.
+  noteEl.textContent =
+    `Ventas completadas desde la apertura · ${
+      new Date(shift.opened_at).toLocaleString("es-BO")
+    }`;
+
+  // Mostrar las 100 ventas más recientes de esta caja.
   const { data, error } = await supabase
     .from("sales")
     .select(`
@@ -309,7 +343,15 @@ async function loadHistory() {
 
   if (error) {
     console.error("Error cargando historial:", error);
-    historyEl.innerHTML = `<tr><td colspan="5" class="empty-row">No se pudo cargar el historial de ventas.</td></tr>`;
+
+    historyEl.innerHTML = `
+      <tr>
+        <td colspan="5" class="empty-row">
+          No se pudo cargar el historial de ventas.
+        </td>
+      </tr>
+    `;
+
     $("#history-message").textContent = error.message;
     return;
   }
@@ -318,7 +360,7 @@ async function loadHistory() {
   renderHistory(salesHistory);
 }
 
-/* EVENTOS DE LA INTERFAZ */
+/* EVENTOS DE LA INTERFAZ. */
 searchEl.addEventListener("input", resolveProduct);
 searchEl.addEventListener("change", resolveProduct);
 qtyEl.addEventListener("input", updateSummary);
@@ -360,11 +402,12 @@ $("#history-search").addEventListener("input", () => {
   }));
 });
 
-/* EXPORTACIÓN CSV: incluye los productos de cada venta. */
+/* EXPORTACIÓN CSV: compatible con Excel en español. */
 $("#export-csv").addEventListener("click", () => {
   if (!salesHistory.length) {
     $("#history-message").textContent =
       "No hay ventas para exportar.";
+
     return;
   }
 
@@ -423,10 +466,12 @@ $("#export-csv").addEventListener("click", () => {
     });
   });
 
-  const csv = "\uFEFF" + rows.map((row) =>
+  // La primera línea indica a Excel que el separador es punto y coma.
+  // El BOM ayuda a conservar correctamente los acentos y caracteres especiales.
+  const csv = "\uFEFFsep=;\r\n" + rows.map((row) =>
     row.map((value) =>
       `"${String(value ?? "").replace(/"/g, '""')}"`
-    ).join(",")
+    ).join(";")
   ).join("\r\n");
 
   const blob = new Blob([csv], {
@@ -543,6 +588,7 @@ $("#complete-sale").addEventListener("click", async () => {
   }
 });
 
+/* CARGA INICIAL. */
 await Promise.all([
   loadProducts(),
   loadHistory()
