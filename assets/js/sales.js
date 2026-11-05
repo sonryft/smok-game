@@ -520,11 +520,11 @@ $("#export-csv").addEventListener("click", async () => {
     ]);
 
     // Formato compatible con Excel en español.
-    const csv = "\\uFEFFsep=;\\r\\n" + rows.map((row) =>
+    const csv = "\uFEFFsep=;\r\n" + rows.map((row) =>
       row.map((value) =>
         `"${String(value ?? "").replace(/"/g, '""')}"`
       ).join(";")
-    ).join("\\r\\n");
+    ).join("\r\n");
 
     const blob = new Blob([csv], {
       type: "text/csv;charset=utf-8;"
