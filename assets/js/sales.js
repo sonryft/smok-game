@@ -399,7 +399,7 @@ $("#history-search").addEventListener("input", () => {
   }));
 });
 
-/* EXPORTACIÓN CSV: descarga TODAS las ventas de la caja abierta. */
+/* EXPORTACIÓN CSV: descarga TODAS las ventas de la caja abierta con sus productos. */
 $("#export-csv").addEventListener("click", async () => {
   const button = $("#export-csv");
   const message = $("#history-message");
@@ -459,7 +459,7 @@ $("#export-csv").addEventListener("click", async () => {
       offset += pageSize;
     }
 
-    // Solo ventas completadas.
+    // Exportar únicamente ventas completadas.
     const completedSales = allSales.filter((sale) => {
       const status = String(sale.status || "").toLowerCase();
 
@@ -472,7 +472,7 @@ $("#export-csv").addEventListener("click", async () => {
     }
 
     const rows = [
-      ["Fecha y hora", "Cantidad", "Método de pago", "Total"]
+      ["Fecha y hora", "Producto vendido", "Cantidad", "Método de pago", "Total"]
     ];
 
     let exportedTotal = 0;
@@ -482,7 +482,18 @@ $("#export-csv").addEventListener("click", async () => {
         ? new Date(sale.created_at).toLocaleString("es-BO")
         : "";
 
-      const quantity = (sale.sale_items || []).reduce(
+      const items = sale.sale_items || [];
+
+      // Si una venta incluye varios productos, se muestran todos en la misma celda.
+      const productNames = items.map((item) => {
+        const name = item.product_name_snapshot || "Producto sin nombre";
+        const sku = item.sku_snapshot ? ` (${item.sku_snapshot})` : "";
+        const quantity = Number(item.quantity || 0);
+
+        return `${name}${sku} x ${quantity}`;
+      }).join("; ");
+
+      const quantity = items.reduce(
         (sum, item) => sum + Number(item.quantity || 0),
         0
       );
@@ -492,6 +503,7 @@ $("#export-csv").addEventListener("click", async () => {
 
       rows.push([
         date,
+        productNames,
         quantity,
         methodLabel(sale.payment_method),
         saleTotal.toFixed(2)
@@ -503,15 +515,16 @@ $("#export-csv").addEventListener("click", async () => {
       "TOTAL VENDIDO",
       "",
       "",
+      "",
       exportedTotal.toFixed(2)
     ]);
 
     // Formato compatible con Excel en español.
-    const csv = "\uFEFFsep=;\r\n" + rows.map((row) =>
+    const csv = "\\uFEFFsep=;\\r\\n" + rows.map((row) =>
       row.map((value) =>
         `"${String(value ?? "").replace(/"/g, '""')}"`
       ).join(";")
-    ).join("\r\n");
+    ).join("\\r\\n");
 
     const blob = new Blob([csv], {
       type: "text/csv;charset=utf-8;"
